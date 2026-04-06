@@ -1,4 +1,4 @@
-const API = 'http://localhost:3333';
+const API = 'https://juris-assistant-api.onrender.com';
 let token = null;
 
 const loginDiv = document.getElementById('loginDiv');
@@ -56,11 +56,72 @@ document.getElementById('sairBtn').onclick = () => {
   token = null;
   loginDiv.style.display = 'block';
   mainDiv.style.display = 'none';
-  document.getElementById('email').value = 'teste@teste.com';
+  document.getElementById('email').value = 'render@teste.com';
   document.getElementById('senha').value = '123456';
   statusMsg.innerHTML = 'Aguardando login...';
   resultMsg.innerHTML = '';
   resultadoPre.innerHTML = '';
+};
+
+// ABRIR TRIBUNAL
+document.getElementById('abrirTribunalBtn').onclick = () => {
+  const url = document.getElementById('tribunalSelect').value;
+  if (url) {
+    chrome.tabs.create({ url: url });
+  } else {
+    resultMsg.innerHTML = '❌ Selecione um tribunal primeiro!';
+  }
+};
+
+// EXTRAIR ANDAMENTO DA PÁGINA ATUAL
+document.getElementById('extrairBtn').onclick = async () => {
+  resultMsg.innerHTML = '🔄 Extraindo andamento...';
+  
+  try {
+    // Pega a aba ativa
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
+    // Executa o script na página
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      function: () => {
+        // Função de extração
+        const selectores = ['.movimentacao', '.movement', '.andamento', '.movimentacao-processo'];
+        let andamento = '';
+        let numeroProcesso = '';
+        
+        for (const sel of selectores) {
+          const elem = document.querySelector(sel);
+          if (elem && elem.innerText.trim().length > 0) {
+            andamento = elem.innerText;
+            break;
+          }
+        }
+        
+        const numElem = document.querySelector('.numero-processo, .processo-numero, [class*="numero"]');
+        if (numElem) {
+          numeroProcesso = numElem.innerText;
+        }
+        
+        return { andamento, numeroProcesso, url: window.location.href };
+      }
+    });
+    
+    const data = results[0].result;
+    
+    if (data.andamento && data.andamento.length > 10) {
+      let textoFinal = data.andamento;
+      if (data.numeroProcesso) {
+        textoFinal = `Processo nº ${data.numeroProcesso}\n\n${textoFinal}`;
+      }
+      document.getElementById('texto').value = textoFinal;
+      resultMsg.innerHTML = '✅ Andamento extraído com sucesso!';
+    } else {
+      resultMsg.innerHTML = '❌ Não foi possível extrair. Tente copiar manualmente.';
+    }
+  } catch(e) {
+    resultMsg.innerHTML = '❌ Erro ao extrair: ' + e.message;
+  }
 };
 
 // Função genérica para chamar a IA
