@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Juris Assistant",
   "version": "2.0.0",
-  "description": "Assistente jurídico com IA - Padrões PJe",
+  "description": "Assistente juridico com IA",
   "permissions": ["storage", "activeTab", "tabs", "scripting", "sidePanel"],
   "host_permissions": [
     "http://localhost:3333/*",
