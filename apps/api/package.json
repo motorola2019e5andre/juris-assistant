@@ -1,27 +1,26 @@
 {
-  "name": "api",
+  "name": "juris-assistant-api",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "API do Juris Assistant - Sistema jurídico com IA",
+  "main": "dist/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "@fastify/cors": "^11.2.0",
-    "@fastify/jwt": "^10.0.0",
-    "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.8.0",
-    "dotenv": "^17.4.1",
-    "fastify": "^5.8.4",
-    "openai": "^6.33.0",
-    "zod": "^4.3.6"
+    "@fastify/cors": "^8.5.0",
+    "@fastify/jwt": "^8.0.0",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.0.0",
+    "dotenv": "^16.0.0",
+    "fastify": "^4.28.0",
+    "zod": "^3.22.0"
   },
   "devDependencies": {
-    "@types/node": "^25.5.2",
-    "tsx": "^4.21.0",
-    "typescript": "^6.0.2"
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
   }
 }
