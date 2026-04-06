@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Juris Assistant</title>
+  <style>
+    body { width: 450px; padding: 16px; font-family: Arial; background: #f5f7fa; }
+    h3 { color: #1a472a; text-align: center; margin: 0 0 16px 0; }
+    input, textarea { width: 100%; margin: 8px 0; padding: 10px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
+    button { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; margin: 8px 0; font-weight: bold; }
+    .btn-client { background: #2d6a4f; color: white; }
+    .btn-technical { background: #1e6091; color: white; }
+    .btn-petition { background: #7b2cbf; color: white; }
+    .btn-logout { background: #dc3545; color: white; margin-top: 0; }
+    .msg { padding: 10px; background: #e8f0fe; border-radius: 8px; font-size: 12px; margin: 8px 0; }
+    pre { background: white; padding: 12px; font-size: 12px; white-space: pre-wrap; border-radius: 8px; border: 1px solid #ddd; max-height: 350px; overflow-y: auto; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .logout-btn { background: #dc3545; color: white; border: none; border-radius: 20px; padding: 4px 12px; cursor: pointer; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h3>⚖️ Juris Assistant</h3>
+  
+  <!-- TELA DE LOGIN -->
+  <div id="loginDiv">
+    <input type="email" id="email" placeholder="E-mail" value="teste@teste.com">
+    <input type="password" id="senha" placeholder="Senha" value="123456">
+    <button id="logarBtn" style="background:#2d6a4f; color:white;">LOGAR</button>
+    <div id="statusMsg" class="msg">Aguardando login...</div>
+  </div>
+  
+  <!-- TELA PRINCIPAL -->
+  <div id="mainDiv" style="display:none;">
+    <div class="header">
+      <span id="userEmail" style="font-size:12px; color:#666;">teste@teste.com</span>
+      <button id="sairBtn" class="logout-btn">Sair</button>
+    </div>
+    
+    <textarea id="texto" rows="5" placeholder="Cole aqui o andamento processual..."></textarea>
+    
+    <button id="clienteBtn" class="btn-client">📱 Resumo para Cliente</button>
+    <button id="tecnicoBtn" class="btn-technical">⚖️ Resumo Técnico</button>
+    <button id="peticaoBtn" class="btn-petition">📝 Assistente de Petição</button>
+    
+    <div id="resultMsg" class="msg"></div>
+    <pre id="resultado"></pre>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
