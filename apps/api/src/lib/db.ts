@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 
 const db = new Database('juris_dev.db');
 
+// Criar tabelas com campo role
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
@@ -10,6 +11,7 @@ db.exec(`
     email TEXT UNIQUE,
     password TEXT NOT NULL,
     credits INTEGER DEFAULT 50,
+    role TEXT DEFAULT 'reclamante',
     createdAt TEXT DEFAULT CURRENT_TIMESTAMP
   );
 `);
@@ -19,11 +21,22 @@ export function findUserByEmail(email: string) {
   return stmt.get(email);
 }
 
-export function createUser(name: string, email: string, password: string) {
+export function createUser(name: string, email: string, password: string, role: string = 'reclamante') {
   const id = randomUUID();
-  const stmt = db.prepare('INSERT INTO users (id, name, email, password) VALUES (?, ?, ?, ?)');
-  stmt.run(id, name, email, password);
-  return { id, name, email, credits: 50 };
+  const stmt = db.prepare('INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)');
+  stmt.run(id, name, email, password, role);
+  return { id, name, email, credits: 50, role };
+}
+
+export function updateUserRole(userId: string, role: string) {
+  const stmt = db.prepare('UPDATE users SET role = ? WHERE id = ?');
+  stmt.run(role, userId);
+}
+
+export function getUserRole(userId: string): string {
+  const stmt = db.prepare('SELECT role FROM users WHERE id = ?');
+  const result = stmt.get(userId);
+  return result ? (result as any).role : 'reclamante';
 }
 
 export function updateUserCredits(userId: string, credits: number) {
