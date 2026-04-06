@@ -167,13 +167,20 @@ export default async function aiRoutes(app: FastifyInstance) {
     const { text } = summarizeSchema.parse(request.body);
     const role = getUserRole(userId);
 
-    const hasCredits = await checkCredits(userId, 2);
+   export default async function aiRoutes(app: FastifyInstance) {
+  
+  app.post('/summarize-client', { preHandler: authenticate }, async (request, reply) => {
+    const userId = getUserIdFromRequest(request);
+    const { text } = summarizeSchema.parse(request.body);
+    const role = getUserRole(userId);
+
+    const hasCredits = await checkCredits(userId, 1);
     if (!hasCredits) {
       return reply.status(402).send({ error: 'Créditos insuficientes' });
     }
 
-    const result = await mockSummarizeTechnical(text, role);
-    await consumeCredits(userId, 2);
+    const result = await mockSummarizeClient(text, role);
+    await consumeCredits(userId, 1);
 
     const user = findUserByEmail(userId);
     const remainingCredits = user ? (user as any).credits : 0;
@@ -181,18 +188,39 @@ export default async function aiRoutes(app: FastifyInstance) {
     return reply.send({ result, creditsRemaining: remainingCredits, role });
   });
   
+  // RESUMO TÉCNICO - CORRIGIDO (1 crédito)
+  app.post('/summarize-technical', { preHandler: authenticate }, async (request, reply) => {
+    const userId = getUserIdFromRequest(request);
+    const { text } = summarizeSchema.parse(request.body);
+    const role = getUserRole(userId);
+
+    const hasCredits = await checkCredits(userId, 1);  // ← MUDOU PARA 1
+    if (!hasCredits) {
+      return reply.status(402).send({ error: 'Créditos insuficientes' });
+    }
+
+    const result = await mockSummarizeTechnical(text, role);
+    await consumeCredits(userId, 1);  // ← MUDOU PARA 1
+
+    const user = findUserByEmail(userId);
+    const remainingCredits = user ? (user as any).credits : 0;
+    
+    return reply.send({ result, creditsRemaining: remainingCredits, role });
+  });
+  
+  // ASSISTENTE DE PETIÇÃO - CORRIGIDO (1 crédito)
   app.post('/draft-petition', { preHandler: authenticate }, async (request, reply) => {
     const userId = getUserIdFromRequest(request);
     const { text } = summarizeSchema.parse(request.body);
     const role = getUserRole(userId);
 
-    const hasCredits = await checkCredits(userId, 5);
+    const hasCredits = await checkCredits(userId, 1);  // ← MUDOU PARA 1
     if (!hasCredits) {
       return reply.status(402).send({ error: 'Créditos insuficientes' });
     }
 
     const result = await mockDraftPetition(text, role);
-    await consumeCredits(userId, 5);
+    await consumeCredits(userId, 1);  // ← MUDOU PARA 1
 
     const user = findUserByEmail(userId);
     const remainingCredits = user ? (user as any).credits : 0;

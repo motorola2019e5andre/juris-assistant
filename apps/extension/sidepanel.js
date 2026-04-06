@@ -164,6 +164,17 @@ document.getElementById('lerPaginaBtn').onclick = async () => {
   }
 };
 
+// ABRIR TRIBUNAL
+document.getElementById('abrirTribunalBtn').onclick = () => {
+  const url = document.getElementById('tribunalSelect').value;
+  if (url) {
+    chrome.tabs.create({ url: url });
+    resultMsg.innerHTML = 'Abrindo tribunal...';
+  } else {
+    resultMsg.innerHTML = 'Selecione um tribunal primeiro!';
+  }
+};
+
 // CHAMAR IA
 async function callAI(endpoint, nomeFeature) {
   const texto = document.getElementById('texto').value;
