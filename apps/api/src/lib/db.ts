@@ -3,7 +3,6 @@ import { randomUUID } from 'crypto';
 
 const db = new Database('juris_dev.db');
 
-// Criar tabelas
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,

@@ -9,11 +9,6 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
 }
 
 export function getUserIdFromRequest(request: FastifyRequest): string {
-  const user = request.user as { id: string; officeId: string };
+  const user = request.user as { id: string };
   return user.id;
-}
-
-export function getOfficeIdFromRequest(request: FastifyRequest): string {
-  const user = request.user as { id: string; officeId: string };
-  return user.officeId;
 }

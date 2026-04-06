@@ -10,10 +10,9 @@ const app = Fastify({ logger: true });
 app.register(cors, { origin: true });
 app.register(jwt, { secret: process.env.JWT_SECRET || 'segredo-padrao' });
 
-// Rotas
 app.register(require('./modules/auth/routes'), { prefix: '/v1/auth' });
 app.register(require('./modules/ai/routes'), { prefix: '/v1/ai' });
-app.register(require('./modules/pje/routes'), { prefix: '/v1' });  // ← ADICIONE ESTA LINHA
+app.register(require('./modules/pje/routes'), { prefix: '' });
 
 app.get('/health', async () => {
   return { status: 'ok', timestamp: new Date().toISOString() };
