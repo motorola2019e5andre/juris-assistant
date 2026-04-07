@@ -102,6 +102,43 @@ Seu advogado esta acompanhando todas as movimentacoes.
 Proximo passo: Aguardar nova movimentacao processual.`;
 }
 
+async function mockSummarizeTechnical(text: string, role: string): Promise<string> {
+  return `RESUMO TECNICO:
+
+1. O QUE FOI DECIDIDO: Analise processual em andamento.
+2. PRAZO: Aguardar proxima movimentacao.
+3. RISCO: Baixo.
+4. ESTRATEGIA RECOMENDADA: Acompanhar o processo.
+5. PROXIMA PECA: Peticao de acompanhamento.`;
+}
+
+async function mockDraftPetition(text: string, role: string): Promise<string> {
+  return `ASSISTENTE DE PETICAO:
+
+EXCELENTISSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO
+
+Processo nº: [Numero do processo]
+
+1. DOS FATOS
+[Descrever os fatos]
+
+2. DA FUNDAMENTACAO
+- Violacao da CLT
+- Jurisprudencia aplicavel
+
+3. DOS PEDIDOS
+- Pagamento de verbas rescisorias
+- Horas extras e reflexos
+
+4. DAS PROVAS
+Requer a producao de todos os meios de prova.
+
+5. DO VALOR DA CAUSA
+Da-se a causa o valor de R$ [valor estimado].
+
+Nestes termos, pede deferimento.`;
+}
+
 // ============================================
 // ROTAS
 // ============================================
@@ -173,6 +210,11 @@ app.post('/v1/auth/login', async (request, reply) => {
   });
 });
 
+// ============================================
+// ROTAS DE IA (3 FUNCIONALIDADES)
+// ============================================
+
+// 1. Resumo para cliente
 app.post('/v1/ai/summarize-client', async (request, reply) => {
   try {
     await request.jwtVerify();
@@ -182,6 +224,7 @@ app.post('/v1/ai/summarize-client', async (request, reply) => {
   
   const officeId = getOfficeIdFromRequest(request);
   const { text } = request.body as { text: string };
+  const userRole = (request.user as any).role || 'reclamante';
   
   const office = db.prepare('SELECT credits FROM offices WHERE id = ?').get(officeId) as any;
   
@@ -189,23 +232,89 @@ app.post('/v1/ai/summarize-client', async (request, reply) => {
     return reply.status(402).send({ error: 'Créditos insuficientes' });
   }
   
-  const result = await mockSummarizeClient(text, 'reclamante');
+  const result = await mockSummarizeClient(text, userRole);
   
   db.prepare('UPDATE offices SET credits = credits - 1 WHERE id = ?').run(officeId);
   
   const updated = db.prepare('SELECT credits FROM offices WHERE id = ?').get(officeId) as any;
   
-  return reply.send({ result, creditsRemaining: updated?.credits || 0 });
+  return reply.send({ result, creditsRemaining: updated?.credits || 0, role: userRole });
 });
+
+// 2. Resumo técnico
+app.post('/v1/ai/summarize-technical', async (request, reply) => {
+  try {
+    await request.jwtVerify();
+  } catch (err) {
+    return reply.status(401).send({ error: 'Não autorizado' });
+  }
+  
+  const officeId = getOfficeIdFromRequest(request);
+  const { text } = request.body as { text: string };
+  const userRole = (request.user as any).role || 'reclamante';
+  
+  const office = db.prepare('SELECT credits FROM offices WHERE id = ?').get(officeId) as any;
+  
+  if (!office || office.credits < 1) {
+    return reply.status(402).send({ error: 'Créditos insuficientes' });
+  }
+  
+  const result = await mockSummarizeTechnical(text, userRole);
+  
+  db.prepare('UPDATE offices SET credits = credits - 1 WHERE id = ?').run(officeId);
+  
+  const updated = db.prepare('SELECT credits FROM offices WHERE id = ?').get(officeId) as any;
+  
+  return reply.send({ result, creditsRemaining: updated?.credits || 0, role: userRole });
+});
+
+// 3. Assistente de petição
+app.post('/v1/ai/draft-petition', async (request, reply) => {
+  try {
+    await request.jwtVerify();
+  } catch (err) {
+    return reply.status(401).send({ error: 'Não autorizado' });
+  }
+  
+  const officeId = getOfficeIdFromRequest(request);
+  const { text } = request.body as { text: string };
+  const userRole = (request.user as any).role || 'reclamante';
+  
+  const office = db.prepare('SELECT credits FROM offices WHERE id = ?').get(officeId) as any;
+  
+  if (!office || office.credits < 1) {
+    return reply.status(402).send({ error: 'Créditos insuficientes' });
+  }
+  
+  const result = await mockDraftPetition(text, userRole);
+  
+  db.prepare('UPDATE offices SET credits = credits - 1 WHERE id = ?').run(officeId);
+  
+  const updated = db.prepare('SELECT credits FROM offices WHERE id = ?').get(officeId) as any;
+  
+  return reply.send({ result, creditsRemaining: updated?.credits || 0, role: userRole });
+});
+
+// ============================================
+// HEALTH CHECK
+// ============================================
 
 app.get('/health', async () => {
   return { status: 'ok', timestamp: new Date().toISOString() };
 });
 
+// ============================================
+// ADMIN
+// ============================================
+
 app.get('/v1/admin/credits', async (request, reply) => {
   const offices = db.prepare('SELECT id, name, email, credits FROM offices').all();
   return reply.send({ offices });
 });
+
+// ============================================
+// INICIAR SERVIDOR
+// ============================================
 
 const start = async () => {
   try {
