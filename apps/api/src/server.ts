@@ -4,11 +4,35 @@ import jwt from '@fastify/jwt';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { findUserByEmail, createUser, updateUserCredits, getUserRole, updateUserRole } from './lib/db';
+import Database from 'better-sqlite3';
+import { randomUUID } from 'crypto';
 
 dotenv.config();
 
 const app = Fastify({ logger: true });
+const db = new Database('juris_dev.db');
+
+// Criar tabelas
+db.exec(`
+  CREATE TABLE IF NOT EXISTS offices (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE,
+    credits INTEGER DEFAULT 50,
+    createdAt TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE,
+    password TEXT NOT NULL,
+    officeId TEXT,
+    role TEXT DEFAULT 'reclamante',
+    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (officeId) REFERENCES offices(id)
+  );
+`);
 
 app.register(cors, { origin: true });
 app.register(jwt, { secret: process.env.JWT_SECRET || 'segredo-padrao' });
@@ -21,6 +45,7 @@ const registerSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(6),
+  officeName: z.string().min(2),
   role: z.enum(['reclamante', 'reclamada']).default('reclamante'),
 });
 
@@ -37,22 +62,14 @@ const summarizeSchema = z.object({
 // FUNÇÕES AUXILIARES
 // ============================================
 
+function getOfficeIdFromRequest(request: any): string {
+  const user = request.user as { officeId: string };
+  return user.officeId;
+}
+
 function getUserIdFromRequest(request: any): string {
   const user = request.user as { id: string };
   return user.id;
-}
-
-async function checkCredits(userId: string, required: number): Promise<boolean> {
-  const user = findUserByEmail(userId);
-  return user ? (user as any).credits >= required : false;
-}
-
-async function consumeCredits(userId: string, amount: number): Promise<void> {
-  const user = findUserByEmail(userId);
-  if (user) {
-    const currentCredits = (user as any).credits;
-    updateUserCredits(userId, currentCredits - amount);
-  }
 }
 
 // ============================================
@@ -117,33 +134,75 @@ Nestes termos, pede deferimento.`;
 
 app.post('/v1/auth/register', async (request, reply) => {
   const body = registerSchema.parse(request.body);
-  const existingUser = findUserByEmail(body.email);
+  
+  const existingUser = db.prepare('SELECT * FROM users WHERE email = ?').get(body.email);
   if (existingUser) {
     return reply.status(400).send({ error: 'E-mail já cadastrado' });
   }
+  
   const hashedPassword = await bcrypt.hash(body.password, 10);
-  const user = createUser(body.name, body.email, hashedPassword, body.role);
-  const token = app.jwt.sign({ id: user.id, role: user.role });
-  return reply.send({ token, user: { id: user.id, name: user.name, email: user.email, credits: user.credits, role: user.role } });
+  const officeId = randomUUID();
+  const userId = randomUUID();
+  
+  // Criar escritório
+  db.prepare('INSERT INTO offices (id, name, email, credits) VALUES (?, ?, ?, ?)')
+    .run(officeId, body.officeName, body.email, 50);
+  
+  // Criar usuário
+  db.prepare('INSERT INTO users (id, name, email, password, officeId, role) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(userId, body.name, body.email, hashedPassword, officeId, body.role);
+  
+  const token = app.jwt.sign({ id: userId, officeId: officeId, role: body.role });
+  
+  return reply.send({ 
+    token, 
+    user: { 
+      id: userId, 
+      name: body.name, 
+      email: body.email, 
+      credits: 50, 
+      officeId: officeId,
+      role: body.role 
+    } 
+  });
 });
 
 app.post('/v1/auth/login', async (request, reply) => {
   const body = loginSchema.parse(request.body);
-  const user = findUserByEmail(body.email);
+  
+  const user = db.prepare(`
+    SELECT u.*, o.credits as officeCredits 
+    FROM users u 
+    JOIN offices o ON u.officeId = o.id 
+    WHERE u.email = ?
+  `).get(body.email) as any;
+  
   if (!user) {
     return reply.status(401).send({ error: 'Credenciais inválidas' });
   }
-  const validPassword = await bcrypt.compare(body.password, (user as any).password);
-  if (!validPassword) {
+  
+  const valid = await bcrypt.compare(body.password, user.password);
+  if (!valid) {
     return reply.status(401).send({ error: 'Credenciais inválidas' });
   }
-  const role = getUserRole((user as any).id);
-  const token = app.jwt.sign({ id: (user as any).id, role: role });
-  return reply.send({ token, user: { id: (user as any).id, name: (user as any).name, email: (user as any).email, credits: (user as any).credits, role: role } });
+  
+  const token = app.jwt.sign({ id: user.id, officeId: user.officeId, role: user.role });
+  
+  return reply.send({
+    token,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      credits: user.officeCredits,
+      officeId: user.officeId,
+      role: user.role
+    }
+  });
 });
 
 // ============================================
-// ROTAS DE IA
+// ROTAS DE IA (CORRIGIDAS COM CRÉDITOS DO ESCRITÓRIO)
 // ============================================
 
 app.post('/v1/ai/summarize-client', async (request, reply) => {
@@ -153,22 +212,29 @@ app.post('/v1/ai/summarize-client', async (request, reply) => {
     return reply.status(401).send({ error: 'Não autorizado' });
   }
   
-  const userId = getUserIdFromRequest(request);
-  const { text } = summarizeSchema.parse(request.body);
-  const role = getUserRole(userId);
-
-  const hasCredits = await checkCredits(userId, 1);
-  if (!hasCredits) {
+  const officeId = getOfficeIdFromRequest(request);
+  const { text } = request.body as { text: string };
+  const userRole = (request.user as any).role || 'reclamante';
+  
+  // Verificar créditos do escritório
+  const office = db.prepare('SELECT credits FROM offices WHERE id = ?').get(officeId) as any;
+  
+  if (!office || office.credits < 1) {
     return reply.status(402).send({ error: 'Créditos insuficientes' });
   }
-
-  const result = await mockSummarizeClient(text, role);
-  await consumeCredits(userId, 1);
-
-  const user = findUserByEmail(userId);
-  const remainingCredits = user ? (user as any).credits : 0;
   
-  return reply.send({ result, creditsRemaining: remainingCredits, role });
+  const result = await mockSummarizeClient(text, userRole);
+  
+  // Consumir 1 crédito
+  db.prepare('UPDATE offices SET credits = credits - 1 WHERE id = ?').run(officeId);
+  
+  const updated = db.prepare('SELECT credits FROM offices WHERE id = ?').get(officeId) as any;
+  
+  return reply.send({ 
+    result, 
+    creditsRemaining: updated?.credits || 0, 
+    role: userRole 
+  });
 });
 
 app.post('/v1/ai/summarize-technical', async (request, reply) => {
@@ -178,22 +244,22 @@ app.post('/v1/ai/summarize-technical', async (request, reply) => {
     return reply.status(401).send({ error: 'Não autorizado' });
   }
   
-  const userId = getUserIdFromRequest(request);
-  const { text } = summarizeSchema.parse(request.body);
-  const role = getUserRole(userId);
-
-  const hasCredits = await checkCredits(userId, 1);
-  if (!hasCredits) {
+  const officeId = getOfficeIdFromRequest(request);
+  const { text } = request.body as { text: string };
+  const userRole = (request.user as any).role || 'reclamante';
+  
+  const office = db.prepare('SELECT credits FROM offices WHERE id = ?').get(officeId) as any;
+  
+  if (!office || office.credits < 1) {
     return reply.status(402).send({ error: 'Créditos insuficientes' });
   }
-
-  const result = await mockSummarizeTechnical(text, role);
-  await consumeCredits(userId, 1);
-
-  const user = findUserByEmail(userId);
-  const remainingCredits = user ? (user as any).credits : 0;
   
-  return reply.send({ result, creditsRemaining: remainingCredits, role });
+  const result = await mockSummarizeTechnical(text, userRole);
+  db.prepare('UPDATE offices SET credits = credits - 1 WHERE id = ?').run(officeId);
+  
+  const updated = db.prepare('SELECT credits FROM offices WHERE id = ?').get(officeId) as any;
+  
+  return reply.send({ result, creditsRemaining: updated?.credits || 0, role: userRole });
 });
 
 app.post('/v1/ai/draft-petition', async (request, reply) => {
@@ -203,22 +269,22 @@ app.post('/v1/ai/draft-petition', async (request, reply) => {
     return reply.status(401).send({ error: 'Não autorizado' });
   }
   
-  const userId = getUserIdFromRequest(request);
-  const { text } = summarizeSchema.parse(request.body);
-  const role = getUserRole(userId);
-
-  const hasCredits = await checkCredits(userId, 1);
-  if (!hasCredits) {
+  const officeId = getOfficeIdFromRequest(request);
+  const { text } = request.body as { text: string };
+  const userRole = (request.user as any).role || 'reclamante';
+  
+  const office = db.prepare('SELECT credits FROM offices WHERE id = ?').get(officeId) as any;
+  
+  if (!office || office.credits < 1) {
     return reply.status(402).send({ error: 'Créditos insuficientes' });
   }
-
-  const result = await mockDraftPetition(text, role);
-  await consumeCredits(userId, 1);
-
-  const user = findUserByEmail(userId);
-  const remainingCredits = user ? (user as any).credits : 0;
   
-  return reply.send({ result, creditsRemaining: remainingCredits, role });
+  const result = await mockDraftPetition(text, userRole);
+  db.prepare('UPDATE offices SET credits = credits - 1 WHERE id = ?').run(officeId);
+  
+  const updated = db.prepare('SELECT credits FROM offices WHERE id = ?').get(officeId) as any;
+  
+  return reply.send({ result, creditsRemaining: updated?.credits || 0, role: userRole });
 });
 
 // ============================================
