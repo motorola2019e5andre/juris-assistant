@@ -75,10 +75,28 @@ async function callOpenAI(prompt: string, maxTokens: number = 500): Promise<stri
 }
 
 // ============================================
-// ROTAS DE IA (COM OPENAI REAL E SUPORTE A ROLE)
+// PROMPTS OTIMIZADOS (CONFORME SOLICITADO)
 // ============================================
 
-// 1. Resumo para cliente (com role)
+const PROMPTS = {
+  client: `Você é um assistente jurídico. Resuma o seguinte andamento processual em linguagem clara, empática e simples para um cliente leigo. Use "Seu processo", "o juiz decidiu", "o advogado vai agir". Seja direto e tranquilizador. Máximo 500 caracteres.
+
+Andamento:`,
+  
+  technical: `Você é um advogado especialista. Faça um resumo técnico do seguinte andamento processual, destacando: (1) o que foi decidido, (2) prazo relevante, (3) risco para o cliente, (4) próxima ação recomendada. Seja objetivo.
+
+Andamento:`,
+  
+  petition: `Você é um advogado experiente. Com base no andamento abaixo, crie um ESQUELETO DE PEÇA com: (1) endereçamento ao juízo, (2) fatos relevantes, (3) fundamentos jurídicos iniciais (tópicos), (4) pedido genérico, (5) encerramento padrão. Não escreva a peça completa. Use marcadores.
+
+Andamento:`
+};
+
+// ============================================
+// ROTAS DE IA (COM OS PROMPTS OTIMIZADOS)
+// ============================================
+
+// 1. Resumo para cliente
 app.post('/v1/ai/summarize-client', async (request, reply) => {
   const { text, role = 'reclamante' } = request.body as { text: string; role?: string };
   
@@ -88,19 +106,7 @@ app.post('/v1/ai/summarize-client', async (request, reply) => {
     return reply.status(402).send({ error: 'Créditos insuficientes' });
   }
   
-  const poloTexto = role === 'reclamante' ? 'RECLAMANTE (TRABALHADOR)' : 'RECLAMADA (EMPRESA)';
-  const estrategia = role === 'reclamante' 
-    ? 'Defender os direitos do trabalhador, buscar máximos danos morais e materiais.'
-    : 'Defender a empresa, minimizar condenações, contestar pedidos excessivos.';
-  
-  const prompt = `Você é um assistente jurídico atuando pelo ${poloTexto}.
-  
-ESTRATÉGIA: ${estrategia}
-
-Resuma o seguinte andamento processual em linguagem simples, clara e empática para o cliente. Máximo 400 caracteres.
-
-Andamento: ${text}`;
-  
+  const prompt = `${PROMPTS.client}\n\n${text}`;
   const result = await callOpenAI(prompt, 500);
   
   db.prepare('UPDATE offices SET credits = credits - 1 WHERE email = ?').run('admin@juris.com');
@@ -110,7 +116,7 @@ Andamento: ${text}`;
   return reply.send({ result, creditsRemaining: updated?.credits || 0, role });
 });
 
-// 2. Resumo técnico (com role)
+// 2. Resumo técnico
 app.post('/v1/ai/summarize-technical', async (request, reply) => {
   const { text, role = 'reclamante' } = request.body as { text: string; role?: string };
   
@@ -120,24 +126,7 @@ app.post('/v1/ai/summarize-technical', async (request, reply) => {
     return reply.status(402).send({ error: 'Créditos insuficientes' });
   }
   
-  const poloTexto = role === 'reclamante' ? 'RECLAMANTE (TRABALHADOR)' : 'RECLAMADA (EMPRESA)';
-  const estrategia = role === 'reclamante' 
-    ? 'Fortalecer a tese do reclamante, juntar documentos comprobatórios.'
-    : 'Contestar veementemente, buscar provas em contrário.';
-  
-  const prompt = `Você é um advogado sênior atuando pelo ${poloTexto}.
-
-ESTRATÉGIA: ${estrategia}
-
-Faça um resumo técnico do seguinte andamento processual, destacando:
-(1) O QUE FOI DECIDIDO
-(2) PRAZO RELEVANTE
-(3) RISCO PARA O CLIENTE
-(4) ESTRATÉGIA RECOMENDADA
-(5) PRÓXIMA PEÇA
-
-Andamento: ${text}`;
-  
+  const prompt = `${PROMPTS.technical}\n\n${text}`;
   const result = await callOpenAI(prompt, 800);
   
   db.prepare('UPDATE offices SET credits = credits - 1 WHERE email = ?').run('admin@juris.com');
@@ -147,7 +136,7 @@ Andamento: ${text}`;
   return reply.send({ result, creditsRemaining: updated?.credits || 0, role });
 });
 
-// 3. Assistente de petição (com role)
+// 3. Assistente de petição
 app.post('/v1/ai/draft-petition', async (request, reply) => {
   const { text, role = 'reclamante' } = request.body as { text: string; role?: string };
   
@@ -157,20 +146,7 @@ app.post('/v1/ai/draft-petition', async (request, reply) => {
     return reply.status(402).send({ error: 'Créditos insuficientes' });
   }
   
-  const poloTexto = role === 'reclamante' ? 'RECLAMANTE (TRABALHADOR)' : 'RECLAMADA (EMPRESA)';
-  
-  const prompt = `Você é um advogado experiente atuando pelo ${poloTexto}.
-
-Com base no andamento abaixo, crie um ESQUELETO DE PEÇA com:
-(1) Endereçamento ao juízo
-(2) Fatos relevantes (destacando a perspectiva do polo)
-(3) Fundamentação (tópicos com artigos da CLT)
-(4) Pedidos (específicos para o polo)
-(5) Provas
-(6) Valor da causa
-
-Andamento: ${text}`;
-  
+  const prompt = `${PROMPTS.petition}\n\n${text}`;
   const result = await callOpenAI(prompt, 1500);
   
   db.prepare('UPDATE offices SET credits = credits - 1 WHERE email = ?').run('admin@juris.com');
