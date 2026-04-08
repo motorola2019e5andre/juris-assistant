@@ -1,77 +1,86 @@
 // ============================================
 // CONTENT.JS - Extrai dados das páginas do PJe
+// Versão simplificada
 // ============================================
 
 function extrairNumeroProcesso() {
+  // Procura em toda a página
   const text = document.body.innerText;
+  
+  // Padrão PJe: 0001234-56.2024.5.02.0001
   const regex = /\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/;
   const match = text.match(regex);
-  return match ? match[0] : null;
+  
+  if (match) {
+    console.log('✅ Número do processo encontrado:', match[0]);
+    return match[0];
+  }
+  
+  console.log('⚠️ Número do processo não encontrado');
+  return null;
 }
 
 function extrairAndamento() {
+  // Seletores comuns do PJe (mais abrangentes)
   const selectores = [
-    '.movimentacao', '.movement', '.andamento', 
-    '.timeline', '.historico', '.movimentacoes'
+    '.movimentacao', '.movement', '.andamento',
+    '.timeline', '.historico', '.movimentacoes',
+    '.tabela-movimentacoes', 'table tbody tr',
+    '.card-body', '.panel-body', '#movimentacoes'
   ];
   
   for (const sel of selectores) {
-    const elem = document.querySelector(sel);
-    if (elem && elem.innerText.length > 50) {
-      return elem.innerText;
+    const elementos = document.querySelectorAll(sel);
+    for (const el of elementos) {
+      const texto = el.innerText || el.textContent || '';
+      if (texto.length > 50) {
+        console.log('✅ Andamento encontrado no seletor:', sel);
+        return texto;
+      }
     }
   }
+  
+  // Fallback: pega todo o texto da página
+  console.log('⚠️ Nenhum andamento específico encontrado, pegando texto da página');
   return document.body.innerText.substring(0, 3000);
 }
 
 function extrairTribunal() {
   const url = window.location.href;
-  const tribunais = {
-    'pje.tst.jus.br': 'TST',
-    'pje.trt1.jus.br': 'TRT 1ª Regiao (RJ)',
-    'pje.trt2.jus.br': 'TRT 2ª Regiao (SP)',
-    'pje.trt3.jus.br': 'TRT 3ª Regiao (MG)',
-    'pje.trt4.jus.br': 'TRT 4ª Regiao (RS)',
-    'pje.trt5.jus.br': 'TRT 5ª Regiao (BA)',
-    'pje.trt6.jus.br': 'TRT 6ª Regiao (PE)',
-    'pje.trt7.jus.br': 'TRT 7ª Regiao (CE)',
-    'pje.trt8.jus.br': 'TRT 8ª Regiao (PA/AP)',
-    'pje.trt9.jus.br': 'TRT 9ª Regiao (PR)',
-    'pje.trt10.jus.br': 'TRT 10ª Regiao (DF/TO)',
-    'pje.trt11.jus.br': 'TRT 11ª Regiao (AM/RR)',
-    'pje.trt12.jus.br': 'TRT 12ª Regiao (SC)',
-    'pje.trt13.jus.br': 'TRT 13ª Regiao (PB)',
-    'pje.trt14.jus.br': 'TRT 14ª Regiao (RO/AC)',
-    'pje.trt15.jus.br': 'TRT 15ª Regiao (SP)',
-    'pje.trt16.jus.br': 'TRT 16ª Regiao (MA)',
-    'pje.trt17.jus.br': 'TRT 17ª Regiao (ES)',
-    'pje.trt18.jus.br': 'TRT 18ª Regiao (GO)',
-    'pje.trt19.jus.br': 'TRT 19ª Regiao (AL)',
-    'pje.trt20.jus.br': 'TRT 20ª Regiao (SE)',
-    'pje.trt21.jus.br': 'TRT 21ª Regiao (RN)',
-    'pje.trt22.jus.br': 'TRT 22ª Regiao (PI)',
-    'pje.trt23.jus.br': 'TRT 23ª Regiao (MT)',
-    'pje.trt24.jus.br': 'TRT 24ª Regiao (MS)'
-  };
-  for (const [domain, name] of Object.entries(tribunais)) {
-    if (url.includes(domain)) return name;
-  }
-  return 'Tribunal nao identificado';
+  
+  if (url.includes('pje.tst.jus.br')) return 'TST';
+  if (url.includes('pje.trt1.jus.br')) return 'TRT 1ª Região (RJ)';
+  if (url.includes('pje.trt2.jus.br')) return 'TRT 2ª Região (SP)';
+  if (url.includes('pje.trt3.jus.br')) return 'TRT 3ª Região (MG)';
+  if (url.includes('pje.trt4.jus.br')) return 'TRT 4ª Região (RS)';
+  if (url.includes('pje.trt15.jus.br')) return 'TRT 15ª Região (SP)';
+  if (url.includes('pje.trt18.jus.br')) return 'TRT 18ª Região (GO)';
+  
+  return 'Tribunal não identificado';
 }
 
 function extrairDadosCompletos() {
-  return {
+  console.log('🔄 Extraindo dados da página...');
+  
+  const dados = {
     numero: extrairNumeroProcesso(),
     andamento: extrairAndamento(),
     tribunal: extrairTribunal(),
     url: window.location.href,
     titulo: document.title
   };
+  
+  console.log('📋 Dados extraídos:', dados);
+  return dados;
 }
 
+// Ouvir mensagens da extensão
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'extrairProcesso') {
-    sendResponse(extrairDadosCompletos());
+    const dados = extrairDadosCompletos();
+    sendResponse(dados);
     return true;
   }
 });
+
+console.log('🚀 Juris Assistant - Content script carregado!');
