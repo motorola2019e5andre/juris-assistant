@@ -62,6 +62,16 @@
     
     <!-- Botão de extração -->
     <button id="extrairProcessoBtn" class="btn-extract" style="background:#1a472a;">📥 Extrair Processo</button>
+<!-- Seleção do Polo -->
+<div class="role-group" style="display: flex; gap: 16px; margin: 8px 0; padding: 10px; background: #e8f0fe; border-radius: 8px; justify-content: center;">
+  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: bold;">
+    <input type="radio" name="role" value="reclamante" checked> 📌 Reclamante (Trabalhador)
+  </label>
+  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: bold;">
+    <input type="radio" name="role" value="reclamada"> 🏢 Reclamada (Empresa)
+  </label>
+</div>
+<button id="salvarRoleBtn" class="btn-extract" style="background:#1a472a; margin-bottom: 16px;">💾 Salvar minha posição</button>
     
     <!-- Campo de texto -->
     <textarea id="texto" rows="6" placeholder="Cole aqui o andamento processual ou clique em 'Extrair Processo'..."></textarea>

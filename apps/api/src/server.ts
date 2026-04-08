@@ -75,12 +75,12 @@ async function callOpenAI(prompt: string, maxTokens: number = 500): Promise<stri
 }
 
 // ============================================
-// ROTAS DE IA (COM OPENAI REAL)
+// ROTAS DE IA (COM OPENAI REAL E SUPORTE A ROLE)
 // ============================================
 
-// 1. Resumo para cliente
+// 1. Resumo para cliente (com role)
 app.post('/v1/ai/summarize-client', async (request, reply) => {
-  const { text } = request.body as { text: string };
+  const { text, role = 'reclamante' } = request.body as { text: string; role?: string };
   
   const office = db.prepare('SELECT credits FROM offices WHERE email = ?').get('admin@juris.com') as any;
   
@@ -88,7 +88,16 @@ app.post('/v1/ai/summarize-client', async (request, reply) => {
     return reply.status(402).send({ error: 'Créditos insuficientes' });
   }
   
-  const prompt = `Você é um assistente jurídico. Resuma o seguinte andamento processual em linguagem simples, clara e empática para um cliente leigo. Use "Seu processo", "o juiz decidiu", "seu advogado". Máximo 400 caracteres.
+  const poloTexto = role === 'reclamante' ? 'RECLAMANTE (TRABALHADOR)' : 'RECLAMADA (EMPRESA)';
+  const estrategia = role === 'reclamante' 
+    ? 'Defender os direitos do trabalhador, buscar máximos danos morais e materiais.'
+    : 'Defender a empresa, minimizar condenações, contestar pedidos excessivos.';
+  
+  const prompt = `Você é um assistente jurídico atuando pelo ${poloTexto}.
+  
+ESTRATÉGIA: ${estrategia}
+
+Resuma o seguinte andamento processual em linguagem simples, clara e empática para o cliente. Máximo 400 caracteres.
 
 Andamento: ${text}`;
   
@@ -98,12 +107,12 @@ Andamento: ${text}`;
   
   const updated = db.prepare('SELECT credits FROM offices WHERE email = ?').get('admin@juris.com') as any;
   
-  return reply.send({ result, creditsRemaining: updated?.credits || 0 });
+  return reply.send({ result, creditsRemaining: updated?.credits || 0, role });
 });
 
-// 2. Resumo técnico
+// 2. Resumo técnico (com role)
 app.post('/v1/ai/summarize-technical', async (request, reply) => {
-  const { text } = request.body as { text: string };
+  const { text, role = 'reclamante' } = request.body as { text: string; role?: string };
   
   const office = db.prepare('SELECT credits FROM offices WHERE email = ?').get('admin@juris.com') as any;
   
@@ -111,7 +120,21 @@ app.post('/v1/ai/summarize-technical', async (request, reply) => {
     return reply.status(402).send({ error: 'Créditos insuficientes' });
   }
   
-  const prompt = `Você é um advogado sênior. Faça um resumo técnico do seguinte andamento processual, destacando: (1) o que foi decidido, (2) prazo relevante, (3) risco para o cliente, (4) estratégia recomendada, (5) próxima peça.
+  const poloTexto = role === 'reclamante' ? 'RECLAMANTE (TRABALHADOR)' : 'RECLAMADA (EMPRESA)';
+  const estrategia = role === 'reclamante' 
+    ? 'Fortalecer a tese do reclamante, juntar documentos comprobatórios.'
+    : 'Contestar veementemente, buscar provas em contrário.';
+  
+  const prompt = `Você é um advogado sênior atuando pelo ${poloTexto}.
+
+ESTRATÉGIA: ${estrategia}
+
+Faça um resumo técnico do seguinte andamento processual, destacando:
+(1) O QUE FOI DECIDIDO
+(2) PRAZO RELEVANTE
+(3) RISCO PARA O CLIENTE
+(4) ESTRATÉGIA RECOMENDADA
+(5) PRÓXIMA PEÇA
 
 Andamento: ${text}`;
   
@@ -121,12 +144,12 @@ Andamento: ${text}`;
   
   const updated = db.prepare('SELECT credits FROM offices WHERE email = ?').get('admin@juris.com') as any;
   
-  return reply.send({ result, creditsRemaining: updated?.credits || 0 });
+  return reply.send({ result, creditsRemaining: updated?.credits || 0, role });
 });
 
-// 3. Assistente de petição
+// 3. Assistente de petição (com role)
 app.post('/v1/ai/draft-petition', async (request, reply) => {
-  const { text } = request.body as { text: string };
+  const { text, role = 'reclamante' } = request.body as { text: string; role?: string };
   
   const office = db.prepare('SELECT credits FROM offices WHERE email = ?').get('admin@juris.com') as any;
   
@@ -134,7 +157,17 @@ app.post('/v1/ai/draft-petition', async (request, reply) => {
     return reply.status(402).send({ error: 'Créditos insuficientes' });
   }
   
-  const prompt = `Você é um advogado experiente. Com base no andamento abaixo, crie um ESQUELETO DE PEÇA com: (1) endereçamento, (2) fatos relevantes, (3) fundamentação (tópicos), (4) pedidos, (5) provas, (6) valor da causa. Use marcadores.
+  const poloTexto = role === 'reclamante' ? 'RECLAMANTE (TRABALHADOR)' : 'RECLAMADA (EMPRESA)';
+  
+  const prompt = `Você é um advogado experiente atuando pelo ${poloTexto}.
+
+Com base no andamento abaixo, crie um ESQUELETO DE PEÇA com:
+(1) Endereçamento ao juízo
+(2) Fatos relevantes (destacando a perspectiva do polo)
+(3) Fundamentação (tópicos com artigos da CLT)
+(4) Pedidos (específicos para o polo)
+(5) Provas
+(6) Valor da causa
 
 Andamento: ${text}`;
   
@@ -144,7 +177,7 @@ Andamento: ${text}`;
   
   const updated = db.prepare('SELECT credits FROM offices WHERE email = ?').get('admin@juris.com') as any;
   
-  return reply.send({ result, creditsRemaining: updated?.credits || 0 });
+  return reply.send({ result, creditsRemaining: updated?.credits || 0, role });
 });
 
 // ============================================
