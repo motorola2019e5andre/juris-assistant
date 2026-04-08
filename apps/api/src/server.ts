@@ -6,10 +6,12 @@ import bcrypt from 'bcryptjs';
 import Database from 'better-sqlite3';
 import { randomUUID } from 'crypto';
 import fs from 'fs';
+import OpenAI from 'openai';
 
 dotenv.config();
 
 const app = Fastify({ logger: true });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Configurar banco de dados
 const dbPath = process.env.DATABASE_PATH || './juris_dev.db';
@@ -54,60 +56,29 @@ app.register(cors, { origin: true });
 app.register(jwt, { secret: process.env.JWT_SECRET || 'segredo-padrao' });
 
 // ============================================
-// MOCKS DE IA
+// FUNÇÕES DE IA COM OPENAI REAL
 // ============================================
 
-async function mockSummarizeClient(text: string, role: string): Promise<string> {
-  return `📋 RESUMO PARA CLIENTE:
-
-Seu processo está em andamento. O juiz analisou os autos e determinou as providências necessárias.
-
-Seu advogado está acompanhando todas as movimentações.
-
-📌 Próximo passo: Aguardar nova movimentação processual.`;
-}
-
-async function mockSummarizeTechnical(text: string, role: string): Promise<string> {
-  return `📊 RESUMO TÉCNICO:
-
-1. O QUE FOI DECIDIDO: Análise processual em andamento.
-2. PRAZO: Aguardar próxima movimentação.
-3. RISCO: Baixo.
-4. ESTRATÉGIA: Acompanhar o processo.
-5. PRÓXIMA PEÇA: Petição de acompanhamento.`;
-}
-
-async function mockDraftPetition(text: string, role: string): Promise<string> {
-  return `📝 ASSISTENTE DE PETIÇÃO:
-
-EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO
-
-**Processo nº:** [Número do processo]
-
-**1. DOS FATOS**
-[Descrever os fatos]
-
-**2. DA FUNDAMENTAÇÃO**
-- Violação da CLT
-- Jurisprudência aplicável
-
-**3. DOS PEDIDOS**
-- Pagamento de verbas rescisórias
-- Horas extras e reflexos
-
-**4. DAS PROVAS**
-Requer a produção de todos os meios de prova.
-
-**5. DO VALOR DA CAUSA**
-Dá-se à causa o valor de R$ [valor estimado].
-
-Nestes termos, pede deferimento.`;
+async function callOpenAI(prompt: string, maxTokens: number = 500): Promise<string> {
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: maxTokens,
+      temperature: 0.7,
+    });
+    return response.choices[0].message.content || 'Não foi possível gerar o resumo.';
+  } catch (error: any) {
+    console.error('Erro OpenAI:', error.message);
+    return `Erro ao gerar: ${error.message}. Tente novamente mais tarde.`;
+  }
 }
 
 // ============================================
-// ROTAS DE IA (SEM AUTENTICAÇÃO)
+// ROTAS DE IA (COM OPENAI REAL)
 // ============================================
 
+// 1. Resumo para cliente
 app.post('/v1/ai/summarize-client', async (request, reply) => {
   const { text } = request.body as { text: string };
   
@@ -117,7 +88,11 @@ app.post('/v1/ai/summarize-client', async (request, reply) => {
     return reply.status(402).send({ error: 'Créditos insuficientes' });
   }
   
-  const result = await mockSummarizeClient(text, 'reclamante');
+  const prompt = `Você é um assistente jurídico. Resuma o seguinte andamento processual em linguagem simples, clara e empática para um cliente leigo. Use "Seu processo", "o juiz decidiu", "seu advogado". Máximo 400 caracteres.
+
+Andamento: ${text}`;
+  
+  const result = await callOpenAI(prompt, 500);
   
   db.prepare('UPDATE offices SET credits = credits - 1 WHERE email = ?').run('admin@juris.com');
   
@@ -126,6 +101,7 @@ app.post('/v1/ai/summarize-client', async (request, reply) => {
   return reply.send({ result, creditsRemaining: updated?.credits || 0 });
 });
 
+// 2. Resumo técnico
 app.post('/v1/ai/summarize-technical', async (request, reply) => {
   const { text } = request.body as { text: string };
   
@@ -135,7 +111,11 @@ app.post('/v1/ai/summarize-technical', async (request, reply) => {
     return reply.status(402).send({ error: 'Créditos insuficientes' });
   }
   
-  const result = await mockSummarizeTechnical(text, 'reclamante');
+  const prompt = `Você é um advogado sênior. Faça um resumo técnico do seguinte andamento processual, destacando: (1) o que foi decidido, (2) prazo relevante, (3) risco para o cliente, (4) estratégia recomendada, (5) próxima peça.
+
+Andamento: ${text}`;
+  
+  const result = await callOpenAI(prompt, 800);
   
   db.prepare('UPDATE offices SET credits = credits - 1 WHERE email = ?').run('admin@juris.com');
   
@@ -144,6 +124,7 @@ app.post('/v1/ai/summarize-technical', async (request, reply) => {
   return reply.send({ result, creditsRemaining: updated?.credits || 0 });
 });
 
+// 3. Assistente de petição
 app.post('/v1/ai/draft-petition', async (request, reply) => {
   const { text } = request.body as { text: string };
   
@@ -153,7 +134,11 @@ app.post('/v1/ai/draft-petition', async (request, reply) => {
     return reply.status(402).send({ error: 'Créditos insuficientes' });
   }
   
-  const result = await mockDraftPetition(text, 'reclamante');
+  const prompt = `Você é um advogado experiente. Com base no andamento abaixo, crie um ESQUELETO DE PEÇA com: (1) endereçamento, (2) fatos relevantes, (3) fundamentação (tópicos), (4) pedidos, (5) provas, (6) valor da causa. Use marcadores.
+
+Andamento: ${text}`;
+  
+  const result = await callOpenAI(prompt, 1500);
   
   db.prepare('UPDATE offices SET credits = credits - 1 WHERE email = ?').run('admin@juris.com');
   
