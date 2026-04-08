@@ -38,6 +38,17 @@ document.getElementById('extrairProcessoBtn').onclick = async () => {
   }
 };
 
+// ABRIR TRIBUNAL SELECIONADO
+document.getElementById('abrirTribunalBtn').onclick = () => {
+  const url = document.getElementById('tribunalSelect').value;
+  if (url) {
+    chrome.tabs.create({ url: url });
+    resultMsg.innerHTML = '🔗 Abrindo tribunal...';
+  } else {
+    resultMsg.innerHTML = '❌ Selecione um tribunal primeiro!';
+  }
+};
+
 // ============================================
 // FUNÇÃO GENÉRICA PARA CHAMAR A IA
 // ============================================
