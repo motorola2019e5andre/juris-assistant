@@ -1,5 +1,5 @@
 // ============================================
-// SIDEPANEL.JS - Versão completa
+// SIDEPANEL.JS - Versão completa e corrigida
 // ============================================
 
 const API = 'https://juris-assistant-api.onrender.com';
@@ -8,59 +8,114 @@ const resultMsg = document.getElementById('resultMsg');
 const resultadoPre = document.getElementById('resultado');
 
 // ============================================
-// EXTRAIR PROCESSO (INCLUINDO DOCUMENTOS)
+// EXTRAIR PROCESSO COMPLETO
 // ============================================
 document.getElementById('extrairProcessoBtn').onclick = async () => {
-  resultMsg.innerHTML = '🔄 Extraindo processo e documentos...';
+  resultMsg.innerHTML = '🔄 Extraindo processo completo...';
   resultadoPre.innerHTML = '';
   
   try {
     const response = await chrome.runtime.sendMessage({ action: 'extrairProcesso' });
     
+    // Verifica se houve erro
     if (response.error) {
       resultMsg.innerHTML = '❌ ' + response.error;
       return;
     }
     
+    // Verifica se a resposta é válida
+    if (!response) {
+      resultMsg.innerHTML = '❌ Nenhum dado recebido da página. Verifique se você está em um processo do PJe.';
+      return;
+    }
+    
+    // Preenche o campo do número do processo se disponível
     if (response.numero) {
-      document.getElementById('numeroProcesso').value = response.numero;
+      const numeroInput = document.getElementById('numeroProcesso');
+      if (numeroInput) numeroInput.value = response.numero;
     }
     
     // Monta o texto completo para a IA
     let textoCompleto = '';
     
-    textoCompleto += `🏛️ TRIBUNAL: ${response.tribunal}\n`;
+    // Cabeçalho do processo
+    textoCompleto += `🏛️ TRIBUNAL: ${response.tribunal || 'Não identificado'}\n`;
     textoCompleto += `📋 PROCESSO Nº: ${response.numero || 'Não identificado'}\n`;
+    textoCompleto += `⚖️ CLASSE: ${response.classe || 'Não informada'}\n`;
+    textoCompleto += `📅 DISTRIBUIÇÃO: ${response.dataDistribuicao || 'Não informada'}\n`;
+    textoCompleto += `🏢 ÓRGÃO JULGADOR: ${response.orgaoJulgador || 'Não informado'}\n`;
     if (response.valorCausa) textoCompleto += `💰 VALOR DA CAUSA: R$ ${response.valorCausa}\n`;
     textoCompleto += `📅 DATA EXTRAÇÃO: ${response.dataExtracao || new Date().toISOString()}\n\n`;
     
+    // Partes do processo
     if (response.partes) {
       textoCompleto += `👥 PARTES:\n`;
       if (response.partes.reclamante) textoCompleto += `  Reclamante: ${response.partes.reclamante}\n`;
       if (response.partes.reclamado) textoCompleto += `  Reclamado: ${response.partes.reclamado}\n`;
+      if (response.partes.autores && response.partes.autores.length > 0) {
+        response.partes.autores.forEach(autor => {
+          textoCompleto += `  Autor: ${autor}\n`;
+        });
+      }
+      if (response.partes.reus && response.partes.reus.length > 0) {
+        response.partes.reus.forEach(reu => {
+          textoCompleto += `  Réu: ${reu}\n`;
+        });
+      }
       textoCompleto += `\n`;
     }
     
-    if (response.andamento) {
-      textoCompleto += `📌 ANDAMENTO:\n${response.andamento}\n\n`;
+    // Movimentações processuais
+    if (response.movimentacoes && Array.isArray(response.movimentacoes) && response.movimentacoes.length > 0) {
+      textoCompleto += `📌 MOVIMENTAÇÕES (${response.movimentacoes.length}):\n`;
+      for (let i = 0; i < Math.min(response.movimentacoes.length, 20); i++) {
+        const mov = response.movimentacoes[i];
+        const textoMov = typeof mov === 'string' ? mov : (mov.texto || mov.toString());
+        textoCompleto += `  ${i+1}. ${textoMov.substring(0, 300)}\n`;
+      }
+      if (response.movimentacoes.length > 20) {
+        textoCompleto += `  ... e mais ${response.movimentacoes.length - 20} movimentações\n`;
+      }
+      textoCompleto += `\n`;
     }
     
-    if (response.documentos && response.documentos.length > 0) {
+    // Documentos do processo
+    if (response.documentos && Array.isArray(response.documentos) && response.documentos.length > 0) {
       textoCompleto += `📄 DOCUMENTOS ENCONTRADOS (${response.documentos.length}):\n\n`;
-      for (const doc of response.documentos) {
-        textoCompleto += `=== ${doc.tipo} ===\n${doc.texto}\n\n`;
+      for (let i = 0; i < Math.min(response.documentos.length, 10); i++) {
+        const doc = response.documentos[i];
+        textoCompleto += `=== ${doc.tipo || 'Documento'} ===\n`;
+        textoCompleto += `${doc.texto || ''}\n\n`;
+      }
+      if (response.documentos.length > 10) {
+        textoCompleto += `... e mais ${response.documentos.length - 10} documentos\n\n`;
       }
     }
     
-    if (textoCompleto) {
-      document.getElementById('texto').value = textoCompleto;
-      resultMsg.innerHTML = `✅ Processo extraído! Tribunal: ${response.tribunal}\n📄 Documentos: ${response.documentos?.length || 0}`;
-      resultadoPre.innerHTML = `✅ Tribunal: ${response.tribunal}\n📋 Número: ${response.numero || 'Não identificado'}\n📄 Documentos extraídos: ${response.documentos?.length || 0}\n💰 Valor: ${response.valorCausa || 'Não informado'}\n📌 Caracteres: ${textoCompleto.length}`;
+    // Verifica se conseguiu extrair algo
+    if (textoCompleto && textoCompleto.length > 100) {
+      const textoArea = document.getElementById('texto');
+      if (textoArea) textoArea.value = textoCompleto;
+      
+      resultMsg.innerHTML = `✅ Processo completo extraído! Tribunal: ${response.tribunal || 'Desconhecido'}\n📄 Movimentações: ${response.movimentacoes?.length || 0}\n📄 Documentos: ${response.documentos?.length || 0}`;
+      
+      resultadoPre.innerHTML = `✅ Tribunal: ${response.tribunal || 'Desconhecido'}\n`;
+      resultadoPre.innerHTML += `📋 Número: ${response.numero || 'Não identificado'}\n`;
+      resultadoPre.innerHTML += `📌 Movimentações: ${response.movimentacoes?.length || 0}\n`;
+      resultadoPre.innerHTML += `📄 Documentos extraídos: ${response.documentos?.length || 0}\n`;
+      resultadoPre.innerHTML += `💰 Valor: ${response.valorCausa || 'Não informado'}\n`;
+      resultadoPre.innerHTML += `📌 Caracteres extraídos: ${textoCompleto.length}\n`;
+      resultadoPre.innerHTML += `📅 Extraído em: ${new Date().toLocaleString()}`;
+      
     } else {
-      resultMsg.innerHTML = '⚠️ Não foi possível extrair o conteúdo. Tente copiar manualmente.';
+      resultMsg.innerHTML = '⚠️ Não foi possível extrair o conteúdo. Tente uma das opções:\n1. Aguarde a página carregar completamente\n2. Role a página para baixo\n3. Copie o texto manualmente';
+      resultadoPre.innerHTML = 'Nenhum conteúdo foi extraído. Certifique-se de que você está em uma página de processo do PJe.';
     }
+    
   } catch(e) {
+    console.error('Erro na extração:', e);
     resultMsg.innerHTML = '❌ Erro ao extrair: ' + e.message;
+    resultadoPre.innerHTML = 'Erro técnico: ' + (e.stack || e.message);
   }
 };
 
@@ -120,17 +175,23 @@ document.getElementById('abrirTribunalBtn').onclick = () => {
 };
 
 // ============================================
-// SELEÇÃO DO POLO
+// SELEÇÃO DO POLO (RECLAMANTE/RECLAMADA)
 // ============================================
+let userRole = 'reclamante';
+
+// Carregar role salvo
 chrome.storage.local.get(['userRole'], (result) => {
   if (result.userRole) {
+    userRole = result.userRole;
     const radio = document.querySelector(`input[name="role"][value="${result.userRole}"]`);
     if (radio) radio.checked = true;
   }
 });
 
+// Salvar role
 document.getElementById('salvarRoleBtn').onclick = () => {
   const selectedRole = document.querySelector('input[name="role"]:checked').value;
+  userRole = selectedRole;
   chrome.storage.local.set({ userRole: selectedRole });
   resultMsg.innerHTML = `✅ Posição salva: ${selectedRole === 'reclamante' ? 'Reclamante (Trabalhador)' : 'Reclamada (Empresa)'}`;
 };

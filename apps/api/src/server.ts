@@ -74,6 +74,10 @@ async function callOpenAI(prompt: string, maxTokens: number = 500): Promise<stri
   }
 }
 
+// ============================================
+// PROMPTS OTIMIZADOS
+// ============================================
+
 const PROMPTS = {
   client: `Você é um assistente jurídico. Resuma o seguinte andamento processual em linguagem clara, empática e simples para um cliente leigo. Use "Seu processo", "o juiz decidiu", "o advogado vai agir". Seja direto e tranquilizador. Máximo 500 caracteres.
 
@@ -83,103 +87,125 @@ Andamento:`,
 
 Andamento:`,
   
-  petition: `Você é um advogado experiente e especialista em direito trabalhista. Com base nos dados extraídos do processo abaixo, crie uma PEÇA PROCESSUAL COMPLETA E APROFUNDADA seguindo esta estrutura:
+  petition: `Você é um advogado experiente e especialista em direito processual do trabalho.
+
+PRIMEIRO, analise o andamento abaixo e IDENTIFIQUE:
+
+1. QUAL É A FASE PROCESSUAL ATUAL
+2. QUAL É A PEÇA CABÍVEL NESTA FASE
+
+DEPOIS, crie a peça adequada com base na fase identificada.
+
+**FASES E PEÇAS CABÍVEIS:**
+- Fase Inicial (após petição inicial): Aguardar citação ou emendar inicial
+- Fase de Contestação (citado): Contestação, exceções, documentos
+- Fase de Instrução: Petição de produção de prova, rol de testemunhas
+- Fase de Decisão (sentença): Recurso ordinário, embargos de declaração
+- Fase de Recurso: Razões recursais, contrarrazões
+- Fase de Execução: Impugnação à execução, cálculos
+
+**ESTRUTURA DA PEÇA SEGUNDO A FASE:**
+
+### Se for CONTESTAÇÃO:
+EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO
+Processo nº: [número]
+Reclamante: [nome]
+Reclamado: [nome]
+
+**1. PRELIMINARES**
+- Inépcia da petição inicial
+- Ilegitimidade passiva
+- Prescrição bienal/quinqüenal
+
+**2. MÉRITO**
+- Impugnação aos pedidos um a um
+- Jornada de trabalho correta
+- Pagamento de verbas rescisórias
+
+**3. PROVAS**
+- Documental (fichas financeiras, cartões de ponto)
+- Testemunhal
+
+**4. PEDIDOS**
+- Improcedência dos pedidos
+- Condenação por litigância de má-fé
+- Justiça gratuita
 
 ---
 
-**EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO DE [CIDADE]**
+### Se for RECURSO ORDINÁRIO:
+EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO
+Processo nº: [número]
+Recorrente: [nome]
+Recorrido: [nome]
 
-**Processo nº:** [Número do processo]
+**RAZÕES DO RECURSO ORDINÁRIO**
 
-**Reclamante:** [Nome do reclamante]
-**Reclamado:** [Nome da empresa]
+**1. TEMPESTIVIDADE**
+O presente recurso é tempestivo, protocolado dentro do prazo legal de 8 dias.
 
----
+**2. PREPARO**
+Comprovante de custas e depósito recursal anexos.
 
-**1. DOS FATOS**
+**3. PRELIMINARES**
+[Apontar preliminares cabíveis]
 
-[Elabore uma narrativa detalhada dos fatos com base no andamento processual, incluindo:
-- Data da contratação e demissão
-- Função exercida
-- Jornada de trabalho (horário de entrada, saída, intervalos)
-- Salário recebido
-- Circunstâncias da rescisão
-- Acidente de trabalho (se houver)
-- Todas as informações relevantes extraídas do processo]
+**4. MÉRITO**
+- Impugnação aos fundamentos da sentença
+- [Argumentar ponto a ponto]
 
----
-
-**2. DA FUNDAMENTAÇÃO JURÍDICA**
-
-[Desenvolva tópicos com base na CLT e jurisprudência do TST:
-
-2.1. Do Vínculo Empregatício (art. 3º da CLT)
-2.2. Das Horas Extras e Reflexos (art. 58, §1º, e art. 59 da CLT, Súmula 264 do TST)
-2.3. Do Adicional Noturno (art. 73 da CLT)
-2.4. Do Intervalo Intrajornada (art. 71 da CLT, Súmula 437 do TST)
-2.5. Das Verbas Rescisórias (arts. 457, 458, 477 e 487 da CLT)
-2.6. Da Multa do art. 477 da CLT
-2.7. Da Indenização por Danos Morais (art. 5º, V e X, CF, arts. 186 e 927 do CC)
-2.8. Do Acidente de Trabalho (arts. 19, 20 e 21 da Lei 8.213/91)
-2.9. Da Justiça Gratuita (Lei 1.060/50, art. 790, §3º da CLT)
-2.10. Dos Honorários Advocatícios (art. 791-A da CLT, Súmula 219 e 329 do TST)]
+**5. PEDIDO**
+Requer o provimento do recurso para reformar a sentença.
 
 ---
 
-**3. DOS PEDIDOS**
+### Se for EMBARGOS DE DECLARAÇÃO:
+EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO
+Processo nº: [número]
+Embargante: [nome]
+Embargado: [nome]
 
-[Formule pedidos específicos e detalhados com base na fundamentação:
+**EMBARGOS DE DECLARAÇÃO**
 
-3.1. Reconhecimento do vínculo empregatício (se for o caso)
-3.2. Pagamento de horas extras e reflexos em RSR, férias + 1/3, 13º salário, FGTS + 40%
-3.3. Pagamento de adicional noturno e reflexos
-3.4. Pagamento do intervalo intrajornada suprimido
-3.5. Pagamento de verbas rescisórias (aviso prévio, férias proporcionais + 1/3, 13º proporcional, multa do art. 477)
-3.6. Liberação das guias do FGTS e seguro-desemprego
-3.7. Indenização por danos morais (valor compatível com o caso)
-3.8. Indenização por danos materiais (se houver)
-3.9. Pagamento de honorários periciais (se houver perícia)
-3.10. Concessão da justiça gratuita
-3.11. Condenação em honorários advocatícios (20% sobre o valor da condenação)
+**1. TEMPESTIVIDADE**
+O presente recurso é tempestivo, protocolado dentro do prazo legal de 5 dias.
 
----
+**2. OMISSÃO/CONTRADIÇÃO/OBSCURIDADE**
+A sentença incorreu em [apontar o vício], conforme detalhado.
 
-**4. DAS PROVAS**
-
-Requer a produção de todos os meios de prova em direito admitidos, especialmente:
-- Documental (fichas financeiras, cartões de ponto, comprovantes de pagamento)
-- Testemunhal (com oitiva de testemunhas presenciais)
-- Pericial (se necessário)
-- Depoimento pessoal do reclamante sob pena de confissão
+**3. PEDIDO DE EFEITO MODIFICATIVO**
+Requer seja suprida a omissão com efeito modificativo.
 
 ---
 
-**5. DO VALOR DA CAUSA**
+### Se for IMPUGNAÇÃO À EXECUÇÃO:
+EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO
+Processo nº: [número]
+Executado: [nome]
+Exequente: [nome]
 
-Dá-se à causa o valor de R$ [valor estimado com base nos pedidos].
+**IMPUGNAÇÃO À EXECUÇÃO**
+
+**1. TEMPESTIVIDADE**
+A presente impugnação é tempestiva.
+
+**2. INEXIGIBILIDADE DO TÍTULO**
+O título executivo é inexigível porque [fundamentar].
+
+**3. IMPUGNAÇÃO AOS CÁLCULOS**
+Os cálculos estão incorretos porque [apontar erros].
+
+**4. PEDIDO**
+- Suspensão da execução
+- Reforma dos cálculos
 
 ---
 
-**6. DOS PEDIDOS FINAIS**
-
-Diante do exposto, requer o recebimento e procedência da presente reclamação para condenar a reclamada ao pagamento de todas as verbas pleiteadas, acrescidas de juros e correção monetária.
-
----
-
-Nestes termos, pede deferimento.
-
-[Local], [data]
-[Advogado] - OAB/UF nº [número]
-
----
-
-**Dados extraídos do processo para análise:**
-%s
-`
+Andamento para análise: %s`
 };
 
 // ============================================
-// ROTAS DE IA (COM OS PROMPTS OTIMIZADOS)
+// ROTAS DE IA
 // ============================================
 
 // 1. Resumo para cliente
@@ -232,8 +258,8 @@ app.post('/v1/ai/draft-petition', async (request, reply) => {
     return reply.status(402).send({ error: 'Créditos insuficientes' });
   }
   
-  const prompt = `${PROMPTS.petition}\n\n${text}`;
-  const result = await callOpenAI(prompt, 1500);
+  const prompt = PROMPTS.petition.replace('%s', text);
+  const result = await callOpenAI(prompt, 2500);
   
   db.prepare('UPDATE offices SET credits = credits - 1 WHERE email = ?').run('admin@juris.com');
   
