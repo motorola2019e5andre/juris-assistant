@@ -1,5 +1,5 @@
 // ============================================
-// CONTENT.JS - Leitura completa do processo
+// CONTENT.JS - Leitura de íntegras de peças
 // Versão universal para TST e todos os TRTs
 // ============================================
 
@@ -60,67 +60,62 @@ function extrairPartes() {
   return partes;
 }
 
-// Extrai todas as movimentações do processo
-function extrairMovimentacoes() {
-  const movimentacoes = [];
-  const selectores = [
-    '.movimentacao', '.movement', '.andamento',
-    '.timeline', '.historico', '.movimentacoes',
-    'table tbody tr', 'div[id*="movimentacao"]'
+// EXTRAI O TEXTO COMPLETO DA PEÇA ATUAL (VISÍVEL NA TELA)
+function extrairTextoVisivel() {
+  // Tenta encontrar o conteúdo principal da peça
+  const seletoresConteudo = [
+    '.documento',
+    '.document-content',
+    '.conteudo-documento',
+    '.texto-documento',
+    'div[class*="documento"]',
+    'div[class*="conteudo"]',
+    'main',
+    '.content',
+    '#conteudo'
   ];
   
-  for (const sel of selectores) {
-    const elementos = document.querySelectorAll(sel);
-    for (const el of elementos) {
-      const texto = el.innerText || el.textContent || '';
-      if (texto.length > 30) {
-        movimentacoes.push(texto);
-      }
+  for (const sel of seletoresConteudo) {
+    const elemento = document.querySelector(sel);
+    if (elemento && elemento.innerText.length > 500) {
+      return elemento.innerText;
     }
   }
   
-  return movimentacoes;
+  // Se não encontrou, tenta pegar o iframe do documento
+  const iframes = document.querySelectorAll('iframe');
+  for (const iframe of iframes) {
+    try {
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (iframeDoc && iframeDoc.body && iframeDoc.body.innerText.length > 500) {
+        return iframeDoc.body.innerText;
+      }
+    } catch(e) { /* erro de cross-origin, ignorar */ }
+  }
+  
+  // Fallback: pega todo o texto visível
+  return document.body.innerText.substring(0, 15000);
 }
 
-// Extrai todos os documentos do processo (Sentença, Petições, Decisões)
-function extrairDocumentos() {
-  const documentos = [];
-  const text = document.body.innerText;
+// EXTRAI TODAS AS PEÇAS DO PROCESSO (navegando pelos documentos)
+function extrairTodasPecas() {
+  const pecas = [];
   
-  // Padrões para identificar documentos
-  const padroes = [
-    { nome: 'SENTENÇA', regex: /SENTENÇA[\s\S]*?(?=PODER JUDICIÁRIO|JUSTIÇA DO TRABALHO|\n\d+\.\s|\f|$)/i },
-    { nome: 'DECISÃO', regex: /DECISÃO[\s\S]*?(?=PODER JUDICIÁRIO|JUSTIÇA DO TRABALHO|\n\d+\.\s|\f|$)/i },
-    { nome: 'DESPACHO', regex: /DESPACHO[\s\S]*?(?=PODER JUDICIÁRIO|JUSTIÇA DO TRABALHO|\n\d+\.\s|\f|$)/i },
-    { nome: 'PETIÇÃO INICIAL', regex: /PETIÇÃO INICIAL[\s\S]*?(?=PODER JUDICIÁRIO|JUSTIÇA DO TRABALHO|\n\d+\.\s|\f|$)/i },
-    { nome: 'CONTESTAÇÃO', regex: /CONTESTAÇÃO[\s\S]*?(?=PODER JUDICIÁRIO|JUSTIÇA DO TRABALHO|\n\d+\.\s|\f|$)/i },
-    { nome: 'RECURSO ORDINÁRIO', regex: /RECURSO ORDINÁRIO[\s\S]*?(?=PODER JUDICIÁRIO|JUSTIÇA DO TRABALHO|\n\d+\.\s|\f|$)/i },
-    { nome: 'RECURSO DE REVISTA', regex: /RECURSO DE REVISTA[\s\S]*?(?=PODER JUDICIÁRIO|JUSTIÇA DO TRABALHO|\n\d+\.\s|\f|$)/i },
-    { nome: 'ACÓRDÃO', regex: /ACÓRDÃO[\s\S]*?(?=PODER JUDICIÁRIO|JUSTIÇA DO TRABALHO|\n\d+\.\s|\f|$)/i }
-  ];
+  // Procura por links de documentos
+  const linksDocumentos = document.querySelectorAll('a[href*="download"], a[href*="documento"], a[href*="pdf"]');
   
-  for (const padrao of padroes) {
-    const match = text.match(padrao.regex);
-    if (match && match[0].length > 200) {
-      documentos.push({ 
-        tipo: padrao.nome, 
-        texto: match[0].substring(0, 8000) 
+  for (const link of linksDocumentos) {
+    const textoLink = link.innerText || link.textContent || '';
+    if (textoLink.length > 10 && textoLink.length < 200) {
+      pecas.push({
+        tipo: textoLink.substring(0, 100),
+        url: link.href,
+        texto: `[Documento disponível em: ${link.href}]`
       });
     }
   }
   
-  // Se não encontrou documentos específicos, tenta pegar o texto principal
-  if (documentos.length === 0) {
-    const mainContent = document.querySelector('main, .conteudo, .content, #conteudo');
-    if (mainContent) {
-      documentos.push({ 
-        tipo: 'CONTEÚDO PRINCIPAL', 
-        texto: mainContent.innerText.substring(0, 8000) 
-      });
-    }
-  }
-  
-  return documentos;
+  return pecas;
 }
 
 // Extrai o valor da causa
@@ -137,21 +132,28 @@ function extrairClasse() {
   return classeMatch ? classeMatch[1].trim() : null;
 }
 
-// Extrai a data de distribuição
-function extrairDataDistribuicao() {
-  const text = document.body.innerText;
-  const dataMatch = text.match(/DISTRIBUIÇÃO:?\s*([\d\/]+)/i);
-  return dataMatch ? dataMatch[1] : null;
+// Extrai movimentações resumidas (títulos)
+function extrairMovimentacoes() {
+  const movimentacoes = [];
+  const selectores = [
+    '.movimentacao', '.movement', '.andamento',
+    '.timeline', '.historico', '.movimentacoes'
+  ];
+  
+  for (const sel of selectores) {
+    const elementos = document.querySelectorAll(sel);
+    for (const el of elementos) {
+      const texto = el.innerText || el.textContent || '';
+      if (texto.length > 30 && texto.length < 1000) {
+        movimentacoes.push(texto);
+      }
+    }
+  }
+  
+  return movimentacoes;
 }
 
-// Extrai o órgão julgador
-function extrairOrgaoJulgador() {
-  const text = document.body.innerText;
-  const orgaoMatch = text.match(/ÓRGÃO JULGADOR:?\s*([^\n]+)/i);
-  return orgaoMatch ? orgaoMatch[1].trim() : null;
-}
-
-// Função principal de extração completa
+// Função principal - extrai TUDO
 function extrairDadosCompletos() {
   console.log('🔄 Extraindo dados completos do processo...');
   
@@ -160,17 +162,16 @@ function extrairDadosCompletos() {
     tribunal: extrairTribunal(),
     partes: extrairPartes(),
     classe: extrairClasse(),
-    dataDistribuicao: extrairDataDistribuicao(),
-    orgaoJulgador: extrairOrgaoJulgador(),
     valorCausa: extrairValorCausa(),
     movimentacoes: extrairMovimentacoes(),
-    documentos: extrairDocumentos(),
+    pecaAtual: extrairTextoVisivel(),  // ← ÍNTEGRA DA PEÇA VISÍVEL
+    outrasPecas: extrairTodasPecas(),  // ← LINKS PARA OUTRAS PEÇAS
     url: window.location.href,
     titulo: document.title,
     dataExtracao: new Date().toISOString()
   };
   
-  console.log(`✅ Extraído: ${dados.movimentacoes.length} movimentações, ${dados.documentos.length} documentos`);
+  console.log(`✅ Extraído: ${dados.pecaAtual.length} caracteres da peça atual`);
   return dados;
 }
 
@@ -183,4 +184,4 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-console.log('🚀 Juris Assistant - Content script de leitura completa carregado');
+console.log('🚀 Juris Assistant - Content script de leitura de íntegras carregado');

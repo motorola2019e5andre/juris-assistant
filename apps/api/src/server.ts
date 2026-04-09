@@ -75,66 +75,131 @@ async function callOpenAI(prompt: string, maxTokens: number = 500): Promise<stri
 }
 
 // ============================================
-// PROMPTS OTIMIZADOS
+/// ============================================
+// PROMPTS DE ADVOGADO EXPERIENTE
 // ============================================
 
 const PROMPTS = {
-  client: `Você é um assistente jurídico. Resuma o seguinte andamento processual em linguagem clara, empática e simples para um cliente leigo. Use "Seu processo", "o juiz decidiu", "o advogado vai agir". Seja direto e tranquilizador. Máximo 500 caracteres.
+  // 1. RESUMO PARA CLIENTE (com orientação de advogado)
+  client: `Você é um advogado experiente e especialista em direito trabalhista, com mais de 15 anos de atuação em escritório de advocacia.
 
-Andamento:`,
+Ao explicar o processo para o cliente, você deve:
+
+1. USAR LINGUAGEM SIMPLES: Traduza todos os termos jurídicos para palavras do dia a dia
+2. SER TRANQUILIZADOR: O cliente está preocupado, acalme-o com confiança
+3. EXPLICAR O QUE ACONTECEU: Em 2-3 frases claras
+4. EXPLICAR O QUE O ADVOGADO VAI FAZER: Ações concretas que serão tomadas
+5. DAR UMA PREVISÃO REALISTA: Sem criar falsas expectativas
+6. SER HONESTO SOBRE RISCOS: Se houver riscos, explique de forma suave
+
+**Nunca** use: "Autos", "Juízo", "Partes", "Manifestação", "Intimação"
+**Sempre** use: "Seu processo", "O juiz", "Você", "O advogado vai", "Vamos aguardar"
+
+Máximo 500 caracteres.
+
+Andamento para explicar ao cliente:`,
   
-  technical: `Você é um advogado especialista. Faça um resumo técnico do seguinte andamento processual, destacando: (1) o que foi decidido, (2) prazo relevante, (3) risco para o cliente, (4) próxima ação recomendada. Seja objetivo.
+  // 2. RESUMO TÉCNICO (com estratégia de advogado experiente)
+  technical: `Você é um advogado sênior, especialista em direito processual do trabalho, com vasta experiência em tribunais.
 
-Andamento:`,
+Analise o andamento processual como se fosse o advogado responsável pelo caso e forneça:
+
+**1. ANÁLISE DA DECISÃO/MOVIMENTAÇÃO**
+- O que realmente aconteceu? (tradução jurídica)
+- Qual o fundamento legal? (mencione artigos da CLT/CF)
+
+**2. PRAZOS E RISCOS**
+- Prazos que estão correndo (dias úteis/processuais)
+- Risco real para o cliente (Baixo/Médio/Alto + justificativa)
+- O que pode dar errado?
+
+**3. ESTRATÉGIA RECOMENDADA (AÇÕES CONCRETAS)**
+- O que fazer agora (passo a passo)
+- Qual peça elaborar (nome exato)
+- Documentos necessários
+- Jurisprudência de apoio (se houver)
+
+**4. PRÓXIMOS PASSOS**
+- Cronograma estimado
+- O que o cliente deve saber
+- Honorários envolvidos (se aplicável)
+
+**5. OBSERVAÇÃO DO ADVOGADO**
+- Dica prática baseada na experiência
+- Alerta sobre jurisprudência do tribunal
+
+Seja objetivo, técnico e prático. Use linguagem jurídica apropriada para outro advogado.
+
+Andamento para análise técnica:`,
   
-  petition: `Você é um advogado experiente e especialista em direito processual do trabalho.
+  // 3. ASSISTENTE DE PETIÇÃO (com análise de fase e peça cabível)
+  petition: `Você é um advogado experiente, especialista em direito processual do trabalho, com mais de 15 anos de atuação.
 
-PRIMEIRO, analise o andamento abaixo e IDENTIFIQUE:
+PRIMEIRO, analise o andamento abaixo como um advogado faria:
 
-1. QUAL É A FASE PROCESSUAL ATUAL
-2. QUAL É A PEÇA CABÍVEL NESTA FASE
+1. IDENTIFIQUE A FASE PROCESSUAL ATUAL:
+   - Inicial (aguardando citação)
+   - Contestação (prazo para defesa)
+   - Instrução (provas, audiência)
+   - Decisão (sentença)
+   - Recurso (prazo recursal)
+   - Execução (cumprimento de sentença)
 
-DEPOIS, crie a peça adequada com base na fase identificada.
+2. IDENTIFIQUE A PEÇA CABÍVEL NESTA FASE:
+   - Contestação
+   - Réplica
+   - Razões Recursais
+   - Contrarrazões
+   - Embargos de Declaração
+   - Impugnação à Execução
+   - Petição de Provas
 
-**FASES E PEÇAS CABÍVEIS:**
-- Fase Inicial (após petição inicial): Aguardar citação ou emendar inicial
-- Fase de Contestação (citado): Contestação, exceções, documentos
-- Fase de Instrução: Petição de produção de prova, rol de testemunhas
-- Fase de Decisão (sentença): Recurso ordinário, embargos de declaração
-- Fase de Recurso: Razões recursais, contrarrazões
-- Fase de Execução: Impugnação à execução, cálculos
+DEPOIS, CRIE A PEÇA COMPLETA seguindo o modelo jurídico padrão, com:
+
+- Endereçamento correto ao juízo
+- Preliminares (se aplicável)
+- Mérito com fundamentação legal (CLT, CF, Súmulas TST)
+- Pedidos específicos e detalhados
+- Provas (documental, testemunhal, pericial)
+- Valor da causa
+- Fechamento padrão
 
 **ESTRUTURA DA PEÇA SEGUNDO A FASE:**
 
-### Se for CONTESTAÇÃO:
-EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO
+### Se for CONTESTAÇÃO (Reclamado):
+EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO DE [CIDADE]
 Processo nº: [número]
 Reclamante: [nome]
 Reclamado: [nome]
 
-**1. PRELIMINARES**
-- Inépcia da petição inicial
-- Ilegitimidade passiva
-- Prescrição bienal/quinqüenal
+**CONTESTAÇÃO**
 
-**2. MÉRITO**
-- Impugnação aos pedidos um a um
+**I - PRELIMINARMENTE**
+- Inépcia da petição inicial (fundamento legal)
+- Ilegitimidade passiva (se for o caso)
+- Prescrição bienal/quinqüenal (art. 7º, XXIX, CF)
+
+**II - NO MÉRITO**
+- Impugnação específica a cada pedido
 - Jornada de trabalho correta
-- Pagamento de verbas rescisórias
+- Pagamento de verbas rescisórias comprovado
+- Ausência de danos morais
 
-**3. PROVAS**
-- Documental (fichas financeiras, cartões de ponto)
-- Testemunhal
+**III - PROVAS**
+- Documental (anexar documentos)
+- Testemunhal (rol de testemunhas)
+- Depoimento pessoal do reclamante
 
-**4. PEDIDOS**
+**IV - PEDIDOS**
 - Improcedência dos pedidos
 - Condenação por litigância de má-fé
-- Justiça gratuita
+- Justiça gratuita (se for o caso)
 
----
+**V - VALOR DA CAUSA**
+Dá-se à causa o valor de R$ [valor].
 
-### Se for RECURSO ORDINÁRIO:
-EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO
+### Se for RECURSO ORDINÁRIO (parte vencida):
+EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO DE [CIDADE]
 Processo nº: [número]
 Recorrente: [nome]
 Recorrido: [nome]
@@ -142,25 +207,25 @@ Recorrido: [nome]
 **RAZÕES DO RECURSO ORDINÁRIO**
 
 **1. TEMPESTIVIDADE**
-O presente recurso é tempestivo, protocolado dentro do prazo legal de 8 dias.
+O presente recurso é tempestivo (art. 895, CLT).
 
 **2. PREPARO**
 Comprovante de custas e depósito recursal anexos.
 
 **3. PRELIMINARES**
-[Apontar preliminares cabíveis]
+- Nulidade processual (se houver)
+- Cerceamento de defesa
 
-**4. MÉRITO**
+**4. MÉRITO RECURSAL**
 - Impugnação aos fundamentos da sentença
-- [Argumentar ponto a ponto]
+- Jurisprudência do TST aplicável
+- Violação de dispositivos legais
 
 **5. PEDIDO**
 Requer o provimento do recurso para reformar a sentença.
 
----
-
 ### Se for EMBARGOS DE DECLARAÇÃO:
-EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO
+EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO DE [CIDADE]
 Processo nº: [número]
 Embargante: [nome]
 Embargado: [nome]
@@ -168,18 +233,18 @@ Embargado: [nome]
 **EMBARGOS DE DECLARAÇÃO**
 
 **1. TEMPESTIVIDADE**
-O presente recurso é tempestivo, protocolado dentro do prazo legal de 5 dias.
+Tempestivo (art. 897-A, CLT).
 
-**2. OMISSÃO/CONTRADIÇÃO/OBSCURIDADE**
-A sentença incorreu em [apontar o vício], conforme detalhado.
+**2. VÍCIOS APONTADOS**
+- Omissão: [apontar o ponto omitido]
+- Contradição: [apontar a contradição]
+- Obscuridade: [apontar a obscuridade]
 
-**3. PEDIDO DE EFEITO MODIFICATIVO**
-Requer seja suprida a omissão com efeito modificativo.
-
----
+**3. EFEITO MODIFICATIVO**
+Requer o prequestionamento e efeito modificativo.
 
 ### Se for IMPUGNAÇÃO À EXECUÇÃO:
-EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO
+EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DA ___ VARA DO TRABALHO DE [CIDADE]
 Processo nº: [número]
 Executado: [nome]
 Exequente: [nome]
@@ -187,13 +252,15 @@ Exequente: [nome]
 **IMPUGNAÇÃO À EXECUÇÃO**
 
 **1. TEMPESTIVIDADE**
-A presente impugnação é tempestiva.
+Tempestiva (art. 884, CLT).
 
 **2. INEXIGIBILIDADE DO TÍTULO**
-O título executivo é inexigível porque [fundamentar].
+- Prescrição intercorrente
+- Quitação anual
 
 **3. IMPUGNAÇÃO AOS CÁLCULOS**
-Os cálculos estão incorretos porque [apontar erros].
+- Erros nos cálculos
+- Valores já pagos
 
 **4. PEDIDO**
 - Suspensão da execução
@@ -201,94 +268,5 @@ Os cálculos estão incorretos porque [apontar erros].
 
 ---
 
-Andamento para análise: %s`
+Andamento do processo para análise: %s`
 };
-
-// ============================================
-// ROTAS DE IA
-// ============================================
-
-// 1. Resumo para cliente
-app.post('/v1/ai/summarize-client', async (request, reply) => {
-  const { text, role = 'reclamante' } = request.body as { text: string; role?: string };
-  
-  const office = db.prepare('SELECT credits FROM offices WHERE email = ?').get('admin@juris.com') as any;
-  
-  if (!office || office.credits < 1) {
-    return reply.status(402).send({ error: 'Créditos insuficientes' });
-  }
-  
-  const prompt = `${PROMPTS.client}\n\n${text}`;
-  const result = await callOpenAI(prompt, 500);
-  
-  db.prepare('UPDATE offices SET credits = credits - 1 WHERE email = ?').run('admin@juris.com');
-  
-  const updated = db.prepare('SELECT credits FROM offices WHERE email = ?').get('admin@juris.com') as any;
-  
-  return reply.send({ result, creditsRemaining: updated?.credits || 0, role });
-});
-
-// 2. Resumo técnico
-app.post('/v1/ai/summarize-technical', async (request, reply) => {
-  const { text, role = 'reclamante' } = request.body as { text: string; role?: string };
-  
-  const office = db.prepare('SELECT credits FROM offices WHERE email = ?').get('admin@juris.com') as any;
-  
-  if (!office || office.credits < 1) {
-    return reply.status(402).send({ error: 'Créditos insuficientes' });
-  }
-  
-  const prompt = `${PROMPTS.technical}\n\n${text}`;
-  const result = await callOpenAI(prompt, 800);
-  
-  db.prepare('UPDATE offices SET credits = credits - 1 WHERE email = ?').run('admin@juris.com');
-  
-  const updated = db.prepare('SELECT credits FROM offices WHERE email = ?').get('admin@juris.com') as any;
-  
-  return reply.send({ result, creditsRemaining: updated?.credits || 0, role });
-});
-
-// 3. Assistente de petição
-app.post('/v1/ai/draft-petition', async (request, reply) => {
-  const { text, role = 'reclamante' } = request.body as { text: string; role?: string };
-  
-  const office = db.prepare('SELECT credits FROM offices WHERE email = ?').get('admin@juris.com') as any;
-  
-  if (!office || office.credits < 1) {
-    return reply.status(402).send({ error: 'Créditos insuficientes' });
-  }
-  
-  const prompt = PROMPTS.petition.replace('%s', text);
-  const result = await callOpenAI(prompt, 2500);
-  
-  db.prepare('UPDATE offices SET credits = credits - 1 WHERE email = ?').run('admin@juris.com');
-  
-  const updated = db.prepare('SELECT credits FROM offices WHERE email = ?').get('admin@juris.com') as any;
-  
-  return reply.send({ result, creditsRemaining: updated?.credits || 0, role });
-});
-
-// ============================================
-// HEALTH CHECK
-// ============================================
-
-app.get('/health', async () => {
-  return { status: 'ok', timestamp: new Date().toISOString() };
-});
-
-// ============================================
-// INICIAR SERVIDOR
-// ============================================
-
-const start = async () => {
-  try {
-    const port = parseInt(process.env.PORT || '3333');
-    await app.listen({ port, host: '0.0.0.0' });
-    console.log(`🚀 Servidor rodando em http://localhost:${port}`);
-  } catch (err) {
-    app.log.error(err);
-    process.exit(1);
-  }
-};
-
-start();
