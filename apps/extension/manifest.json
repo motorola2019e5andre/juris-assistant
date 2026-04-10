@@ -7,8 +7,7 @@
   "host_permissions": [
     "https://juris-assistant-api.onrender.com/",
     "https://*.trt.jus.br/*",
-    "https://*.trf.jus.br/*",
-    "https://*.eproc.trf*.jus.br/*"
+    "https://*.trf.jus.br/*"
   ],
   "action": {
     "default_title": "Juris Assistant",
@@ -24,8 +23,7 @@
     {
       "matches": [
         "https://*.trt.jus.br/*",
-        "https://*.trf.jus.br/*",
-        "https://*.eproc.trf*.jus.br/*"
+        "https://*.trf.jus.br/*"
       ],
       "js": ["content.js"]
     }
