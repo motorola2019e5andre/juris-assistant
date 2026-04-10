@@ -10,8 +10,7 @@
     "https://*.trf.jus.br/*"
   ],
   "action": {
-    "default_title": "Juris Assistant",
-    "default_popup": "popup.html"
+    "default_title": "Juris Assistant"
   },
   "side_panel": {
     "default_path": "sidepanel.html"
