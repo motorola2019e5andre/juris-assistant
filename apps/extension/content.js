@@ -1,9 +1,35 @@
 // ============================================
-// CONTENT.JS - Leitura de íntegras de peças
-// Versão universal para TST e todos os TRTs
+// CONTENT.JS - Extrai TODO o conteúdo da página
 // ============================================
 
-// Extrai o número do processo
+// Função para aguardar a página carregar
+function aguardarCarregamento() {
+  return new Promise((resolve) => {
+    // Verifica se já tem conteúdo
+    if (document.body.innerText.length > 500) {
+      resolve();
+      return;
+    }
+    
+    // Observa mudanças no DOM
+    const observer = new MutationObserver(() => {
+      if (document.body.innerText.length > 500) {
+        observer.disconnect();
+        resolve();
+      }
+    });
+    
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    // Timeout de segurança
+    setTimeout(() => {
+      observer.disconnect();
+      resolve();
+    }, 10000);
+  });
+}
+
+// Extrai o número do processo (se houver)
 function extrairNumeroProcesso() {
   const text = document.body.innerText;
   const regex = /\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/;
@@ -11,177 +37,135 @@ function extrairNumeroProcesso() {
   return match ? match[0] : null;
 }
 
-// Extrai tribunal baseado na URL
-function extrairTribunal() {
-  const url = window.location.href;
-  if (url.includes('pje.tst.jus.br')) return 'TST';
-  if (url.includes('pje.trt1')) return 'TRT 1ª Região (RJ)';
-  if (url.includes('pje.trt2')) return 'TRT 2ª Região (SP)';
-  if (url.includes('pje.trt3')) return 'TRT 3ª Região (MG)';
-  if (url.includes('pje.trt4')) return 'TRT 4ª Região (RS)';
-  if (url.includes('pje.trt5')) return 'TRT 5ª Região (BA)';
-  if (url.includes('pje.trt6')) return 'TRT 6ª Região (PE)';
-  if (url.includes('pje.trt7')) return 'TRT 7ª Região (CE)';
-  if (url.includes('pje.trt8')) return 'TRT 8ª Região (PA/AP)';
-  if (url.includes('pje.trt9')) return 'TRT 9ª Região (PR)';
-  if (url.includes('pje.trt10')) return 'TRT 10ª Região (DF/TO)';
-  if (url.includes('pje.trt11')) return 'TRT 11ª Região (AM/RR)';
-  if (url.includes('pje.trt12')) return 'TRT 12ª Região (SC)';
-  if (url.includes('pje.trt13')) return 'TRT 13ª Região (PB)';
-  if (url.includes('pje.trt14')) return 'TRT 14ª Região (RO/AC)';
-  if (url.includes('pje.trt15')) return 'TRT 15ª Região (SP)';
-  if (url.includes('pje.trt16')) return 'TRT 16ª Região (MA)';
-  if (url.includes('pje.trt17')) return 'TRT 17ª Região (ES)';
-  if (url.includes('pje.trt18')) return 'TRT 18ª Região (GO)';
-  if (url.includes('pje.trt19')) return 'TRT 19ª Região (AL)';
-  if (url.includes('pje.trt20')) return 'TRT 20ª Região (SE)';
-  if (url.includes('pje.trt21')) return 'TRT 21ª Região (RN)';
-  if (url.includes('pje.trt22')) return 'TRT 22ª Região (PI)';
-  if (url.includes('pje.trt23')) return 'TRT 23ª Região (MT)';
-  if (url.includes('pje.trt24')) return 'TRT 24ª Região (MS)';
-  return 'Tribunal não identificado';
+// Extrai o título da página
+function extrairTitulo() {
+  return document.title || 'Sem título';
 }
 
-// Extrai informações das partes
-function extrairPartes() {
-  const partes = { reclamante: '', reclamado: '', autores: [], reus: [] };
-  const text = document.body.innerText;
-  
-  const reclamanteMatch = text.match(/RECLAMANTE:?\s*([^\n]+)/i);
-  const reclamadoMatch = text.match(/RECLAMADO:?\s*([^\n]+)/i);
-  const autorMatch = text.match(/AUTOR:?\s*([^\n]+)/i);
-  const reuMatch = text.match(/RÉU:?\s*([^\n]+)/i);
-  
-  if (reclamanteMatch) partes.reclamante = reclamanteMatch[1].trim();
-  if (reclamadoMatch) partes.reclamado = reclamadoMatch[1].trim();
-  if (autorMatch) partes.autores.push(autorMatch[1].trim());
-  if (reuMatch) partes.reus.push(reuMatch[1].trim());
-  
-  return partes;
+// Extrai a URL
+function extrairUrl() {
+  return window.location.href;
 }
 
-// EXTRAI O TEXTO COMPLETO DA PEÇA ATUAL (VISÍVEL NA TELA)
+// EXTRAI TODO O TEXTO VISÍVEL DA PÁGINA
 function extrairTextoVisivel() {
-  // Tenta encontrar o conteúdo principal da peça
-  const seletoresConteudo = [
-    '.documento',
-    '.document-content',
-    '.conteudo-documento',
-    '.texto-documento',
-    'div[class*="documento"]',
-    'div[class*="conteudo"]',
-    'main',
-    '.content',
-    '#conteudo'
-  ];
+  // Remove scripts e estilos
+  const clones = document.body.cloneNode(true);
+  const scripts = clones.querySelectorAll('script, style, noscript');
+  scripts.forEach(el => el.remove());
   
-  for (const sel of seletoresConteudo) {
-    const elemento = document.querySelector(sel);
-    if (elemento && elemento.innerText.length > 500) {
-      return elemento.innerText;
+  // Pega o texto limpo
+  let texto = clones.innerText || clones.textContent || '';
+  
+  // Limpa linhas vazias excessivas
+  texto = texto.replace(/\n\s*\n\s*\n/g, '\n\n');
+  
+  return texto;
+}
+
+// Extrai todo o HTML da página (opcional)
+function extrairHtml() {
+  return document.documentElement.outerHTML;
+}
+
+// Extrai informações da página
+function extrairMetadados() {
+  const metadados = {};
+  
+  // Tenta pegar meta tags
+  const metaTags = document.querySelectorAll('meta');
+  metaTags.forEach(tag => {
+    const name = tag.getAttribute('name') || tag.getAttribute('property');
+    const content = tag.getAttribute('content');
+    if (name && content) {
+      metadados[name] = content;
     }
-  }
+  });
   
-  // Se não encontrou, tenta pegar o iframe do documento
-  const iframes = document.querySelectorAll('iframe');
-  for (const iframe of iframes) {
-    try {
-      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (iframeDoc && iframeDoc.body && iframeDoc.body.innerText.length > 500) {
-        return iframeDoc.body.innerText;
-      }
-    } catch(e) { /* erro de cross-origin, ignorar */ }
-  }
-  
-  // Fallback: pega todo o texto visível
-  return document.body.innerText.substring(0, 15000);
+  return metadados;
 }
 
-// EXTRAI TODAS AS PEÇAS DO PROCESSO (navegando pelos documentos)
-function extrairTodasPecas() {
-  const pecas = [];
-  
-  // Procura por links de documentos
-  const linksDocumentos = document.querySelectorAll('a[href*="download"], a[href*="documento"], a[href*="pdf"]');
-  
-  for (const link of linksDocumentos) {
-    const textoLink = link.innerText || link.textContent || '';
-    if (textoLink.length > 10 && textoLink.length < 200) {
-      pecas.push({
-        tipo: textoLink.substring(0, 100),
-        url: link.href,
-        texto: `[Documento disponível em: ${link.href}]`
-      });
+// Extrai links da página
+function extrairLinks() {
+  const links = [];
+  const elementos = document.querySelectorAll('a[href]');
+  elementos.forEach(el => {
+    const href = el.href;
+    const texto = el.innerText || '';
+    if (href && !href.startsWith('javascript:')) {
+      links.push({ texto: texto.substring(0, 100), url: href });
     }
-  }
-  
-  return pecas;
+  });
+  return links.slice(0, 50); // Limita a 50 links
 }
 
-// Extrai o valor da causa
-function extrairValorCausa() {
-  const text = document.body.innerText;
-  const valorMatch = text.match(/VALOR DA CAUSA:?\s*R?\$?\s*([\d\.,]+)/i);
-  return valorMatch ? valorMatch[1] : null;
-}
-
-// Extrai a classe do processo
-function extrairClasse() {
-  const text = document.body.innerText;
-  const classeMatch = text.match(/CLASSE:?\s*([^\n]+)/i);
-  return classeMatch ? classeMatch[1].trim() : null;
-}
-
-// Extrai movimentações resumidas (títulos)
-function extrairMovimentacoes() {
-  const movimentacoes = [];
-  const selectores = [
-    '.movimentacao', '.movement', '.andamento',
-    '.timeline', '.historico', '.movimentacoes'
-  ];
-  
-  for (const sel of selectores) {
-    const elementos = document.querySelectorAll(sel);
-    for (const el of elementos) {
-      const texto = el.innerText || el.textContent || '';
-      if (texto.length > 30 && texto.length < 1000) {
-        movimentacoes.push(texto);
-      }
+// Extrai imagens da página
+function extrairImagens() {
+  const imagens = [];
+  const elementos = document.querySelectorAll('img[src]');
+  elementos.forEach(el => {
+    const src = el.src;
+    if (src) {
+      imagens.push(src);
     }
-  }
-  
-  return movimentacoes;
+  });
+  return imagens.slice(0, 20); // Limita a 20 imagens
 }
 
-// Função principal - extrai TUDO
-function extrairDadosCompletos() {
-  console.log('🔄 Extraindo dados completos do processo...');
+// Função principal
+async function extrairDadosCompletos() {
+  console.log('🔄 Aguardando carregamento da página...');
+  
+  await aguardarCarregamento();
+  
+  console.log('📄 Extraindo todo o conteúdo da página...');
+  
+  const textoVisivel = extrairTextoVisivel();
+  const html = extrairHtml();
+  
+  console.log(`✅ Texto extraído: ${textoVisivel.length} caracteres`);
   
   const dados = {
-    numero: extrairNumeroProcesso(),
-    tribunal: extrairTribunal(),
-    partes: extrairPartes(),
-    classe: extrairClasse(),
-    valorCausa: extrairValorCausa(),
-    movimentacoes: extrairMovimentacoes(),
-    pecaAtual: extrairTextoVisivel(),  // ← ÍNTEGRA DA PEÇA VISÍVEL
-    outrasPecas: extrairTodasPecas(),  // ← LINKS PARA OUTRAS PEÇAS
-    url: window.location.href,
-    titulo: document.title,
-    dataExtracao: new Date().toISOString()
+    // Informações básicas
+    url: extrairUrl(),
+    titulo: extrairTitulo(),
+    numeroProcesso: extrairNumeroProcesso(),
+    dataExtracao: new Date().toISOString(),
+    
+    // Conteúdo
+    textoCompleto: textoVisivel,
+    html: html.substring(0, 50000), // Limita para não sobrecarregar
+    
+    // Metadados
+    metadados: extrairMetadados(),
+    
+    // Links e imagens
+    links: extrairLinks(),
+    imagens: extrairImagens(),
+    
+    // Estatísticas
+    estatisticas: {
+      tamanhoTexto: textoVisivel.length,
+      tamanhoHtml: html.length,
+      numeroLinks: extrairLinks().length,
+      numeroImagens: extrairImagens().length
+    }
   };
   
-  console.log(`✅ Extraído: ${dados.pecaAtual.length} caracteres da peça atual`);
   return dados;
 }
 
 // Listener para mensagens
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'extrairProcesso') {
-    const dados = extrairDadosCompletos();
-    sendResponse(dados);
+    extrairDadosCompletos().then(dados => {
+      sendResponse(dados);
+    }).catch(err => {
+      console.error('Erro:', err);
+      sendResponse({ error: err.message });
+    });
     return true;
   }
 });
 
-console.log('🚀 Juris Assistant - Content script de leitura de íntegras carregado');
+console.log('🚀 Juris Assistant - Content script carregado (extração total da página)');
