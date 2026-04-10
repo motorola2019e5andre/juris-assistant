@@ -1,5 +1,5 @@
 // ============================================
-// SIDEPANEL.JS - Versão completa e corrigida
+// SIDEPANEL.JS - Versão corrigida (íntegra)
 // ============================================
 
 const API = 'https://juris-assistant-api.onrender.com';
@@ -11,65 +11,58 @@ const resultadoPre = document.getElementById('resultado');
 // EXTRAIR PROCESSO COMPLETO
 // ============================================
 document.getElementById('extrairProcessoBtn').onclick = async () => {
-  resultMsg.innerHTML = '🔄 Extraindo processo completo...';
+  resultMsg.innerHTML = '🔄 Aguardando resposta do conteúdo da página...';
   resultadoPre.innerHTML = '';
   
   try {
     const response = await chrome.runtime.sendMessage({ action: 'extrairProcesso' });
     
-    if (response.error) {
+    if (response && response.error) {
       resultMsg.innerHTML = '❌ ' + response.error;
       return;
     }
     
     if (!response) {
-      resultMsg.innerHTML = '❌ Nenhum dado recebido. Verifique se você está em um processo do PJe.';
+      resultMsg.innerHTML = '❌ Nenhum dado recebido. Certifique-se de que está em um processo do PJe.';
       return;
     }
     
+    // Preenche o número do processo se disponível
     if (response.numero) {
       const numeroInput = document.getElementById('numeroProcesso');
       if (numeroInput) numeroInput.value = response.numero;
     }
     
-    // Monta o texto completo para a IA
-    let textoCompleto = '';
+    // PRIORIDADE: usar o texto completo enviado pelo content.js
+    let textoCompleto = response.textoCompleto || '';
     
-    textoCompleto += `🏛️ TRIBUNAL: ${response.tribunal || 'Não identificado'}\n`;
-    textoCompleto += `📋 PROCESSO Nº: ${response.numero || 'Não identificado'}\n`;
-    if (response.valorCausa) textoCompleto += `💰 VALOR DA CAUSA: R$ ${response.valorCausa}\n`;
-    textoCompleto += `📅 DATA EXTRAÇÃO: ${response.dataExtracao || new Date().toISOString()}\n\n`;
-    
-    if (response.partes) {
-      textoCompleto += `👥 PARTES:\n`;
-      if (response.partes.reclamante) textoCompleto += `  Reclamante: ${response.partes.reclamante}\n`;
-      if (response.partes.reclamado) textoCompleto += `  Reclamado: ${response.partes.reclamado}\n`;
-      textoCompleto += `\n`;
+    // Se não veio texto completo, tenta montar com outras propriedades (fallback)
+    if (!textoCompleto || textoCompleto.length < 100) {
+      if (response.andamento) textoCompleto += response.andamento + '\n\n';
+      if (response.movimentacoes && response.movimentacoes.length) {
+        textoCompleto += response.movimentacoes.join('\n');
+      }
     }
     
-    if (response.andamento) {
-      textoCompleto += `📌 ANDAMENTO:\n${response.andamento}\n\n`;
-    }
-    
-    if (response.textoCompleto && response.textoCompleto.length > 0) {
-      textoCompleto += response.textoCompleto;
-    }
-    
-    if (textoCompleto && textoCompleto.length > 100) {
+    // Exibe estatísticas no resultado
+    const caracteres = textoCompleto.length;
+    if (caracteres > 100) {
       const textoArea = document.getElementById('texto');
       if (textoArea) textoArea.value = textoCompleto;
       
-      resultMsg.innerHTML = `✅ Processo extraído! Tribunal: ${response.tribunal || 'Desconhecido'}\n📌 Caracteres: ${textoCompleto.length}`;
+      resultMsg.innerHTML = `✅ Processo extraído! Tribunal: ${response.tribunal || 'Desconhecido'} | Caracteres: ${caracteres}`;
       
       resultadoPre.innerHTML = `✅ Tribunal: ${response.tribunal || 'Desconhecido'}\n`;
       resultadoPre.innerHTML += `📋 Número: ${response.numero || 'Não identificado'}\n`;
-      resultadoPre.innerHTML += `📌 Caracteres extraídos: ${textoCompleto.length}\n`;
-      resultadoPre.innerHTML += `📅 Extraído em: ${new Date().toLocaleString()}`;
-      
+      resultadoPre.innerHTML += `📌 Caracteres extraídos: ${caracteres}\n`;
+      resultadoPre.innerHTML += `📅 Extraído em: ${new Date().toLocaleString()}\n\n`;
+      if (caracteres < 500) {
+        resultadoPre.innerHTML += `⚠️ Pouco conteúdo extraído. Certifique-se de que a página do processo está totalmente carregada e, se for um documento, que ele está aberto para visualização.`;
+      }
     } else {
-      resultMsg.innerHTML = '⚠️ Não foi possível extrair o conteúdo. Tente copiar manualmente.';
+      resultMsg.innerHTML = '⚠️ Não foi possível extrair o conteúdo completo. Tente: recarregar a página, aguardar o carregamento total do processo ou abrir o documento (sentença, petição) antes de extrair.';
+      resultadoPre.innerHTML = 'Nenhum texto significativo foi encontrado.';
     }
-    
   } catch(e) {
     console.error('Erro na extração:', e);
     resultMsg.innerHTML = '❌ Erro ao extrair: ' + e.message;
@@ -85,7 +78,7 @@ async function callAI(endpoint, nomeFeature) {
   const userRole = document.querySelector('input[name="role"]:checked')?.value || 'reclamante';
   
   if (!texto || texto.length < 10) {
-    resultMsg.innerHTML = '❌ Cole um texto com pelo menos 10 caracteres!';
+    resultMsg.innerHTML = '❌ Cole um texto com pelo menos 10 caracteres (ou extraia o processo primeiro).';
     return;
   }
   
@@ -105,10 +98,10 @@ async function callAI(endpoint, nomeFeature) {
       resultadoPre.innerHTML = `📌 POLO: ${userRole === 'reclamante' ? 'Reclamante (Trabalhador)' : 'Reclamada (Empresa)'}\n\n${data.result}`;
       resultMsg.innerHTML = '✅ ' + nomeFeature + ' gerado! Créditos restantes: ' + data.creditsRemaining;
     } else {
-      resultMsg.innerHTML = '❌ Erro: ' + JSON.stringify(data);
+      resultMsg.innerHTML = '❌ Erro da IA: ' + JSON.stringify(data);
     }
   } catch(e) {
-    resultMsg.innerHTML = '❌ Erro: ' + e.message;
+    resultMsg.innerHTML = '❌ Erro de conexão: ' + e.message;
   }
 }
 

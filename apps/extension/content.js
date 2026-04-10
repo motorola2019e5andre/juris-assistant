@@ -1,163 +1,134 @@
 // ============================================
-// CONTENT.JS - EXTRAÇÃO TOTAL (TEXTO COMPLETO)
+// CONTENT.JS - EXTRAÇÃO OTIMIZADA (ÍNTEGRA + IFRAMES)
 // ============================================
 
-// 🔍 Documento correto (iframe)
-function getDoc() {
-  const iframe = document.querySelector('iframe');
-  if (iframe && iframe.contentDocument) {
-    return iframe.contentDocument;
+// Aguarda o carregamento completo da página (incluindo iframes)
+function aguardarCarregamento() {
+  return new Promise((resolve) => {
+    let tentativas = 0;
+    const maxTentativas = 40; // ~20 segundos (para páginas lentas)
+    const intervalo = setInterval(() => {
+      tentativas++;
+      // Verifica se há conteúdo significativo (aumentado para 5000)
+      if (document.body.innerText.length > 5000 || tentativas >= maxTentativas) {
+        clearInterval(intervalo);
+        resolve();
+      }
+    }, 500);
+  });
+}
+
+// Obtém o documento com MAIS texto (entre todos os iframes e o documento principal)
+function getMelhorDocumento() {
+  let melhorDoc = document;
+  let melhorTexto = document.body.innerText.length;
+  const iframes = document.querySelectorAll('iframe');
+  for (const iframe of iframes) {
+    try {
+      const doc = iframe.contentDocument;
+      if (doc && doc.body && doc.body.innerText.length > melhorTexto) {
+        melhorTexto = doc.body.innerText.length;
+        melhorDoc = doc;
+      }
+    } catch (e) {
+      // Erro de cross‑origin – ignora esse iframe
+      console.warn('Não foi possível acessar iframe (cross‑origin):', e);
+    }
   }
-  return document;
+  return melhorDoc;
 }
 
-// ⏳ Espera carregar conteúdo
-function wait(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// 🔢 Número do processo
+// Extrai número do processo
 function extrairNumero(doc) {
   const text = doc.body.innerText;
-  const match = text.match(/\d{7}[-.]?\d{2}[-.]?\d{4}[-.]?\d[-.]?\d{2}[-.]?\d{4}/);
+  const regex = /\d{7}[-.]?\d{2}[-.]?\d{4}[-.]?\d[-.]?\d{2}[-.]?\d{4}/;
+  const match = text.match(regex);
   return match ? match[0].replace(/[.-]/g, '') : null;
 }
 
-// 🏛️ Tribunal
+// Extrai tribunal (melhorado com mais domínios)
 function extrairTribunal() {
   const url = window.location.href.toLowerCase();
-  
-  if (url.includes('tst')) return 'TST';
-  if (url.includes('trt1')) return 'TRT 1ª Região (RJ)';
-  if (url.includes('trt2')) return 'TRT 2ª Região (SP)';
-  if (url.includes('trt3')) return 'TRT 3ª Região (MG)';
-  if (url.includes('trt4')) return 'TRT 4ª Região (RS)';
-  if (url.includes('trt5')) return 'TRT 5ª Região (BA)';
-  if (url.includes('trt6')) return 'TRT 6ª Região (PE)';
-  if (url.includes('trt7')) return 'TRT 7ª Região (CE)';
-  if (url.includes('trt8')) return 'TRT 8ª Região (PA/AP)';
-  if (url.includes('trt9')) return 'TRT 9ª Região (PR)';
-  if (url.includes('trt10')) return 'TRT 10ª Região (DF/TO)';
-  if (url.includes('trt11')) return 'TRT 11ª Região (AM/RR)';
-  if (url.includes('trt12')) return 'TRT 12ª Região (SC)';
-  if (url.includes('trt13')) return 'TRT 13ª Região (PB)';
-  if (url.includes('trt14')) return 'TRT 14ª Região (RO/AC)';
-  if (url.includes('trt15')) return 'TRT 15ª Região (SP)';
-  if (url.includes('trt16')) return 'TRT 16ª Região (MA)';
-  if (url.includes('trt17')) return 'TRT 17ª Região (ES)';
-  if (url.includes('trt18')) return 'TRT 18ª Região (GO)';
-  if (url.includes('trt19')) return 'TRT 19ª Região (AL)';
-  if (url.includes('trt20')) return 'TRT 20ª Região (SE)';
-  if (url.includes('trt21')) return 'TRT 21ª Região (RN)';
-  if (url.includes('trt22')) return 'TRT 22ª Região (PI)';
-  if (url.includes('trt23')) return 'TRT 23ª Região (MT)';
-  if (url.includes('trt24')) return 'TRT 24ª Região (MS)';
-  if (url.includes('trf1')) return 'TRF 1ª Região';
-  if (url.includes('trf2')) return 'TRF 2ª Região';
-  if (url.includes('trf3')) return 'TRF 3ª Região';
-  if (url.includes('trf4')) return 'TRF 4ª Região';
-  if (url.includes('trf5')) return 'TRF 5ª Região';
-  if (url.includes('eproc')) return 'EPROC';
-  
-  return 'Não identificado';
+  const tribunais = {
+    'pje.tst.jus.br': 'TST',
+    'pje.trt1.jus.br': 'TRT 1ª Região (RJ)',
+    'pje.trt2.jus.br': 'TRT 2ª Região (SP)',
+    'pje.trt3.jus.br': 'TRT 3ª Região (MG)',
+    'pje.trt4.jus.br': 'TRT 4ª Região (RS)',
+    'pje.trt5.jus.br': 'TRT 5ª Região (BA)',
+    'pje.trt6.jus.br': 'TRT 6ª Região (PE)',
+    'pje.trt7.jus.br': 'TRT 7ª Região (CE)',
+    'pje.trt8.jus.br': 'TRT 8ª Região (PA/AP)',
+    'pje.trt9.jus.br': 'TRT 9ª Região (PR)',
+    'pje.trt10.jus.br': 'TRT 10ª Região (DF/TO)',
+    'pje.trt11.jus.br': 'TRT 11ª Região (AM/RR)',
+    'pje.trt12.jus.br': 'TRT 12ª Região (SC)',
+    'pje.trt13.jus.br': 'TRT 13ª Região (PB)',
+    'pje.trt14.jus.br': 'TRT 14ª Região (RO/AC)',
+    'pje.trt15.jus.br': 'TRT 15ª Região (SP)',
+    'pje.trt16.jus.br': 'TRT 16ª Região (MA)',
+    'pje.trt17.jus.br': 'TRT 17ª Região (ES)',
+    'pje.trt18.jus.br': 'TRT 18ª Região (GO)',
+    'pje.trt19.jus.br': 'TRT 19ª Região (AL)',
+    'pje.trt20.jus.br': 'TRT 20ª Região (SE)',
+    'pje.trt21.jus.br': 'TRT 21ª Região (RN)',
+    'pje.trt22.jus.br': 'TRT 22ª Região (PI)',
+    'pje.trt23.jus.br': 'TRT 23ª Região (MT)',
+    'pje.trt24.jus.br': 'TRT 24ª Região (MS)'
+  };
+  for (const [domain, name] of Object.entries(tribunais)) {
+    if (url.includes(domain)) return name;
+  }
+  return 'Tribunal não identificado';
 }
 
-// 📝 EXTRAI TEXTO COMPLETO - A FUNÇÃO MAIS IMPORTANTE
+// Extrai TODO o texto do documento (limpo e organizado)
 function extrairTextoCompleto(doc) {
-  // Tenta pegar o conteúdo principal
-  const seletoresPrincipais = [
-    'body',
-    'div.conteudo',
-    'div#conteudo',
-    'main',
-    'article',
-    'div[role="main"]',
-    'div.visualizacao-processo',
-    'div.card-body',
-    'div.panel-body'
+  // Seletores abrangentes para conteúdo do PJe (prioridade)
+  const seletores = [
+    'main', 'article', '.conteudo', '#conteudo', '.content', '#content',
+    '.documento', '.document-content', '.texto-documento',
+    'pje-processo-detalhe', 'pje-visualizador-documento',
+    '.card-body', '.panel-body', '.visualizacao-processo',
+    '.movimentacoes', '.andamento', 'body'
   ];
-  
-  let conteudo = null;
-  for (const seletor of seletoresPrincipais) {
-    const elemento = doc.querySelector(seletor);
-    if (elemento && elemento.innerText.length > 500) {
-      conteudo = elemento;
-      break;
-    }
-  }
-  
-  // Se achou conteúdo específico, extrai de forma organizada
-  if (conteudo) {
-    // Remove elementos indesejados
-    const indesejados = conteudo.querySelectorAll('script, style, nav, footer, .menu, .rodape');
-    indesejados.forEach(el => el.remove());
-    
-    return conteudo.innerText.trim();
-  }
-  
-  // Fallback: texto completo do documento
-  return doc.body.innerText.trim();
-}
-
-// 📜 Extrai movimentações
-function extrairMovimentacoes(doc) {
-  const movimentos = [];
-  
-  // Procura tabelas de movimentação
-  const tabelas = doc.querySelectorAll('table');
-  for (const table of tabelas) {
-    if (/moviment|andamento|tramite/i.test(table.innerText)) {
-      const linhas = table.querySelectorAll('tr');
-      for (const linha of linhas) {
-        const texto = linha.innerText.trim();
-        if (texto.length > 10 && texto.length < 1000) {
-          movimentos.push(texto);
-        }
+  let melhorTexto = '';
+  for (const sel of seletores) {
+    const elementos = doc.querySelectorAll(sel);
+    for (const el of elementos) {
+      const texto = el.innerText || el.textContent || '';
+      if (texto.length > melhorTexto.length) {
+        melhorTexto = texto;
       }
     }
   }
-  
-  // Remove duplicatas
-  return [...new Set(movimentos)];
+  // Remove lixo (scripts, estilos, menus, rodapés)
+  let textoLimpo = melhorTexto
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/\n\s*\n\s*\n/g, '\n\n')  // quebras excessivas
+    .trim();
+  return textoLimpo;
 }
 
-// 👥 Partes
-function extrairPartes(doc) {
-  const texto = doc.body.innerText;
-  const partes = { reclamante: '', reclamado: '' };
-  
-  const reclamanteMatch = texto.match(/Reclamante[:\s]+([^\n]{10,200})/i);
-  if (reclamanteMatch) partes.reclamante = reclamanteMatch[1].trim();
-  
-  const reclamadoMatch = texto.match(/Reclamado[:\s]+([^\n]{10,200})/i);
-  if (reclamadoMatch) partes.reclamado = reclamadoMatch[1].trim();
-  
-  return partes;
-}
-
-// 📦 FUNÇÃO PRINCIPAL - EXTRAI TUDO
+// Função principal
 async function extrairDados() {
-  console.log('🔄 Extraindo processo COMPLETO...');
-  
-  await wait(2000);
-  
-  const doc = getDoc();
-  
-  // Extrai TUDO
+  console.log('🔄 Aguardando carregamento completo da página e iframes...');
+  await aguardarCarregamento();
+  await new Promise(r => setTimeout(r, 3000)); // segurança extra
+
+  const doc = getMelhorDocumento(); // pega o documento com mais texto
   const textoCompleto = extrairTextoCompleto(doc);
   const numero = extrairNumero(doc);
   const tribunal = extrairTribunal();
-  const partes = extrairPartes(doc);
-  const movimentacoes = extrairMovimentacoes(doc);
-  
+
   console.log(`✅ Texto extraído: ${textoCompleto.length} caracteres`);
-  console.log(`📌 Movimentações: ${movimentacoes.length}`);
-  
+  console.log(`📌 Número: ${numero}`);
+  console.log(`🏛️ Tribunal: ${tribunal}`);
+
   return {
     numero: numero,
     tribunal: tribunal,
-    partes: partes,
-    movimentacoes: movimentacoes,
     textoCompleto: textoCompleto,
     qtdeCaracteres: textoCompleto.length,
     url: window.location.href,
@@ -166,15 +137,14 @@ async function extrairDados() {
   };
 }
 
-// 📡 Listener
+// Listener
 chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
   if (req.action === 'extrairProcesso') {
-    extrairDados().then(sendResponse).catch(err => {
-      console.error('Erro:', err);
-      sendResponse({ error: err.message });
-    });
+    extrairDados()
+      .then(dados => sendResponse(dados))
+      .catch(err => sendResponse({ error: err.message }));
     return true;
   }
 });
 
-console.log('🚀 Content Script Juris Assistant v4.0 - Extração TOTAL ativada!');
+console.log('🚀 Content Script (versão otimizada) carregado');
