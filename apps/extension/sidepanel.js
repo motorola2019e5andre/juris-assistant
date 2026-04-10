@@ -1,5 +1,5 @@
 // ============================================
-// SIDEPANEL.JS - Versão melhorada (íntegra + feedback)
+// SIDEPANEL.JS - versão corrigida e estável
 // ============================================
 
 const API = 'https://juris-assistant-api.onrender.com';
@@ -8,157 +8,182 @@ const resultMsg = document.getElementById('resultMsg');
 const resultadoPre = document.getElementById('resultado');
 
 // ============================================
-// EXTRAIR PROCESSO COMPLETO
+// EXTRAIR PROCESSO
 // ============================================
-document.getElementById('extrairProcessoBtn').onclick = async () => {
-  resultMsg.innerHTML = '🔄 Aguardando resposta do conteúdo da página...';
-  resultadoPre.innerHTML = '';
-  
-  try {
-    const response = await chrome.runtime.sendMessage({ action: 'extrairProcesso' });
-    
-    if (response && response.error) {
-      resultMsg.innerHTML = '❌ ' + response.error;
-      return;
-    }
-    
-    if (!response) {
-      resultMsg.innerHTML = '❌ Nenhum dado recebido. Certifique-se de que está em um processo do PJe.';
-      return;
-    }
-    
-    // Preenche o número do processo se disponível
-    if (response.numero) {
-      const numeroInput = document.getElementById('numeroProcesso');
-      if (numeroInput) numeroInput.value = response.numero;
-    }
-    
-    // PRIORIDADE: usar o texto completo enviado pelo content.js
-    let textoCompleto = response.textoCompleto || '';
-    
-    // Se não veio texto completo, tenta montar com outras propriedades (fallback)
-    if (!textoCompleto || textoCompleto.length < 100) {
-      if (response.andamento) textoCompleto += response.andamento + '\n\n';
-      if (response.movimentacoes && response.movimentacoes.length) {
-        textoCompleto += response.movimentacoes.join('\n');
+const extrairBtn = document.getElementById('extrairProcessoBtn');
+
+if (extrairBtn) {
+  extrairBtn.onclick = async () => {
+
+    resultMsg.innerHTML = '🔄 Extraindo processo...';
+    resultadoPre.innerHTML = '';
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'extrairProcesso'
+      });
+
+      if (!response) {
+        resultMsg.innerHTML = '❌ Nenhuma resposta da página';
+        return;
       }
-    }
-    
-    // Exibe estatísticas no resultado
-    const caracteres = textoCompleto.length;
-    if (caracteres > 100) {
+
+      if (response.error) {
+        resultMsg.innerHTML = '❌ ' + response.error;
+        return;
+      }
+
+      // número
+      if (response.numero) {
+        const numeroInput = document.getElementById('numeroProcesso');
+        if (numeroInput) numeroInput.value = response.numero;
+      }
+
+      const textoCompleto = response.textoCompleto || '';
+      const caracteres = textoCompleto.length;
+
+      if (caracteres < 50) {
+        resultMsg.innerHTML = '⚠️ Pouco conteúdo extraído';
+      } else {
+        resultMsg.innerHTML = `✅ Extraído (${caracteres} caracteres)`;
+      }
+
       const textoArea = document.getElementById('texto');
       if (textoArea) textoArea.value = textoCompleto;
-      
-      resultMsg.innerHTML = `✅ Processo extraído! Tribunal: ${response.tribunal || 'Desconhecido'} | Caracteres: ${caracteres}`;
-      
-      resultadoPre.innerHTML = `✅ Tribunal: ${response.tribunal || 'Desconhecido'}\n`;
-      resultadoPre.innerHTML += `📋 Número: ${response.numero || 'Não identificado'}\n`;
-      resultadoPre.innerHTML += `📌 Caracteres extraídos: ${caracteres}\n`;
-      resultadoPre.innerHTML += `📅 Extraído em: ${new Date().toLocaleString()}\n\n`;
-      
-      if (caracteres < 1000) {
-        resultadoPre.innerHTML += `⚠️ **Pouco conteúdo extraído (${caracteres} caracteres).**\n`;
-        resultadoPre.innerHTML += `Para obter a íntegra do documento (sentença, petição, etc.), siga estes passos:\n`;
-        resultadoPre.innerHTML += `1. No PJe, clique no documento desejado (ex: Sentença, Petição Inicial, Contestação).\n`;
-        resultadoPre.innerHTML += `2. Aguarde o documento abrir (geralmente em um iframe).\n`;
-        resultadoPre.innerHTML += `3. Clique em "Extrair Processo" novamente.\n`;
-        resultadoPre.innerHTML += `4. O texto completo do documento será capturado.\n`;
-      }
-    } else {
-      resultMsg.innerHTML = '⚠️ Nenhum texto significativo encontrado.';
-      resultadoPre.innerHTML = 'Certifique-se de que:\n';
-      resultadoPre.innerHTML += '1. Você está em um processo do PJe.\n';
-      resultadoPre.innerHTML += '2. O documento está aberto (clique no link da sentença, petição, etc.).\n';
-      resultadoPre.innerHTML += '3. Aguarde o carregamento completo da página/iframe.\n';
-      resultadoPre.innerHTML += '4. Tente novamente.';
+
+      resultadoPre.innerHTML =
+`🏛️ Tribunal: ${response.tribunal || 'Não identificado'}
+📋 Número: ${response.numero || 'Não identificado'}
+📊 Caracteres: ${caracteres}
+📅 Extraído: ${new Date().toLocaleString()}
+`;
+
+    } catch (e) {
+      resultMsg.innerHTML = '❌ Erro: ' + e.message;
     }
-  } catch(e) {
-    console.error('Erro na extração:', e);
-    resultMsg.innerHTML = '❌ Erro ao extrair: ' + e.message;
-    resultadoPre.innerHTML = 'Erro técnico: ' + (e.stack || e.message);
-  }
-};
+  };
+}
 
 // ============================================
-// FUNÇÃO GENÉRICA PARA CHAMAR A IA
+// CHAMADA IA
 // ============================================
 async function callAI(endpoint, nomeFeature) {
-  const texto = document.getElementById('texto').value;
-  const userRole = document.querySelector('input[name="role"]:checked')?.value || 'reclamante';
-  
-  if (!texto || texto.length < 10) {
-    resultMsg.innerHTML = '❌ Cole um texto com pelo menos 10 caracteres (ou extraia o processo primeiro).';
+
+  const texto = document.getElementById('texto')?.value || '';
+  const role = document.querySelector('input[name="role"]:checked')?.value || 'reclamante';
+
+  if (texto.length < 10) {
+    resultMsg.innerHTML = '❌ Texto muito curto';
     return;
   }
-  
-  resultMsg.innerHTML = '🔄 Gerando ' + nomeFeature + '...';
+
+  resultMsg.innerHTML = '🔄 ' + nomeFeature + '...';
   resultadoPre.innerHTML = '';
-  
+
   try {
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+
     const response = await fetch(API + '/v1/ai/' + endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: texto, role: userRole })
+      body: JSON.stringify({ text: texto, role }),
+      signal: controller.signal
     });
-    
-    const data = await response.json();
-    
-    if (data.result) {
-      resultadoPre.innerHTML = `📌 POLO: ${userRole === 'reclamante' ? 'Reclamante (Trabalhador)' : 'Reclamada (Empresa)'}\n\n${data.result}`;
-      resultMsg.innerHTML = '✅ ' + nomeFeature + ' gerado! Créditos restantes: ' + data.creditsRemaining;
-    } else {
-      resultMsg.innerHTML = '❌ Erro da IA: ' + JSON.stringify(data);
+
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      throw new Error('HTTP ' + response.status);
     }
-  } catch(e) {
-    resultMsg.innerHTML = '❌ Erro de conexão: ' + e.message;
+
+    const data = await response.json();
+
+    if (data.error) {
+      resultMsg.innerHTML = '❌ ' + data.error;
+      return;
+    }
+
+    resultadoPre.innerHTML =
+`📌 POLO: ${role === 'reclamante' ? 'Reclamante' : 'Reclamada'}
+
+${data.result || 'Sem resposta'}
+`;
+
+    resultMsg.innerHTML =
+      '✅ Concluído' +
+      (data.creditsRemaining ? ' | Créditos: ' + data.creditsRemaining : '');
+
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      resultMsg.innerHTML = '⏱️ Timeout';
+    } else {
+      resultMsg.innerHTML = '❌ Erro: ' + e.message;
+    }
   }
 }
 
 // ============================================
-// BOTÕES DAS 3 FUNCIONALIDADES
+// BOTÕES IA
 // ============================================
-document.getElementById('clienteBtn').onclick = () => callAI('summarize-client', 'Resumo para cliente');
-document.getElementById('tecnicoBtn').onclick = () => callAI('summarize-technical', 'Resumo técnico');
-document.getElementById('peticaoBtn').onclick = () => callAI('draft-petition', 'Assistente de petição');
+document.getElementById('clienteBtn')?.addEventListener(
+  'click',
+  () => callAI('summarize-client', 'Resumo cliente')
+);
+
+document.getElementById('tecnicoBtn')?.addEventListener(
+  'click',
+  () => callAI('summarize-technical', 'Resumo técnico')
+);
+
+document.getElementById('peticaoBtn')?.addEventListener(
+  'click',
+  () => callAI('draft-petition', 'Petição')
+);
 
 // ============================================
 // ABRIR TRIBUNAL
 // ============================================
-const abrirTribunalBtn = document.getElementById('abrirTribunalBtn');
-if (abrirTribunalBtn) {
-  abrirTribunalBtn.onclick = () => {
-    const url = document.getElementById('tribunalSelect').value;
-    if (url) {
-      chrome.tabs.create({ url: url });
-      resultMsg.innerHTML = '🔗 Abrindo tribunal...';
-    } else {
-      resultMsg.innerHTML = '❌ Selecione um tribunal primeiro!';
-    }
-  };
-}
+document.getElementById('abrirTribunalBtn')?.addEventListener('click', () => {
+
+  const url = document.getElementById('tribunalSelect')?.value;
+
+  if (!url) {
+    resultMsg.innerHTML = '❌ Selecione um tribunal';
+    return;
+  }
+
+  chrome.tabs.create({ url });
+  resultMsg.innerHTML = '🔗 Abrindo tribunal...';
+});
 
 // ============================================
-// SELEÇÃO DO POLO (RECLAMANTE/RECLAMADA)
+// ROLE
 // ============================================
-let userRole = 'reclamante';
-
-// Carregar role salvo
 chrome.storage.local.get(['userRole'], (result) => {
+
   if (result.userRole) {
-    userRole = result.userRole;
-    const radio = document.querySelector(`input[name="role"][value="${result.userRole}"]`);
+    const radio = document.querySelector(
+      `input[name="role"][value="${result.userRole}"]`
+    );
+
     if (radio) radio.checked = true;
   }
 });
 
-// Salvar role
-const salvarRoleBtn = document.getElementById('salvarRoleBtn');
-if (salvarRoleBtn) {
-  salvarRoleBtn.onclick = () => {
-    const selectedRole = document.querySelector('input[name="role"]:checked').value;
-    userRole = selectedRole;
-    chrome.storage.local.set({ userRole: selectedRole });
-    resultMsg.innerHTML = `✅ Posição salva: ${selectedRole === 'reclamante' ? 'Reclamante (Trabalhador)' : 'Reclamada (Empresa)'}`;
-  };
-}
+document.getElementById('salvarRoleBtn')?.addEventListener('click', () => {
+
+  const selectedRole =
+    document.querySelector('input[name="role"]:checked')?.value;
+
+  if (!selectedRole) return;
+
+  chrome.storage.local.set({ userRole: selectedRole });
+
+  resultMsg.innerHTML =
+    '✅ Posição salva: ' +
+    (selectedRole === 'reclamante'
+      ? 'Reclamante'
+      : 'Reclamada');
+});

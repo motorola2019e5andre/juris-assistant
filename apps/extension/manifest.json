@@ -1,32 +1,37 @@
 {
   "manifest_version": 3,
   "name": "Juris Assistant",
-  "version": "1.0.0",
-  "description": "Assistente jurídico com IA para TRT, TRF e EPROC",
-  "permissions": ["storage", "sidePanel", "activeTab", "scripting"],
-  "host_permissions": [
-    "https://juris-assistant-api.onrender.com/",
-    "https://*.trt.jus.br/*",
-    "https://*.trf.jus.br/*"
+  "version": "1.1",
+  "description": "Assistente jurídico com IA",
+
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "tabs",
+    "sidePanel"
   ],
-  "action": {
-    "default_title": "Juris Assistant"
-  },
-  "side_panel": {
-    "default_path": "sidepanel.html"
-  },
+
+  "host_permissions": [
+    "<all_urls>"
+  ],
+
   "background": {
     "service_worker": "background.js"
   },
+
+  "action": {
+    "default_title": "Juris Assistant"
+  },
+
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+
   "content_scripts": [
     {
-      "matches": [
-        "https://*.trt.jus.br/*",
-        "https://*.trf.jus.br/*"
-      ],
+      "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "all_frames": true,
-      "run_at": "document_end"
+      "all_frames": true
     }
   ]
 }
