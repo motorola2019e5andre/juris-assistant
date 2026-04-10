@@ -1,5 +1,5 @@
 // ============================================
-// SIDEPANEL.JS - Versão corrigida (íntegra)
+// SIDEPANEL.JS - Versão melhorada (íntegra + feedback)
 // ============================================
 
 const API = 'https://juris-assistant-api.onrender.com';
@@ -56,12 +56,22 @@ document.getElementById('extrairProcessoBtn').onclick = async () => {
       resultadoPre.innerHTML += `📋 Número: ${response.numero || 'Não identificado'}\n`;
       resultadoPre.innerHTML += `📌 Caracteres extraídos: ${caracteres}\n`;
       resultadoPre.innerHTML += `📅 Extraído em: ${new Date().toLocaleString()}\n\n`;
-      if (caracteres < 500) {
-        resultadoPre.innerHTML += `⚠️ Pouco conteúdo extraído. Certifique-se de que a página do processo está totalmente carregada e, se for um documento, que ele está aberto para visualização.`;
+      
+      if (caracteres < 1000) {
+        resultadoPre.innerHTML += `⚠️ **Pouco conteúdo extraído (${caracteres} caracteres).**\n`;
+        resultadoPre.innerHTML += `Para obter a íntegra do documento (sentença, petição, etc.), siga estes passos:\n`;
+        resultadoPre.innerHTML += `1. No PJe, clique no documento desejado (ex: Sentença, Petição Inicial, Contestação).\n`;
+        resultadoPre.innerHTML += `2. Aguarde o documento abrir (geralmente em um iframe).\n`;
+        resultadoPre.innerHTML += `3. Clique em "Extrair Processo" novamente.\n`;
+        resultadoPre.innerHTML += `4. O texto completo do documento será capturado.\n`;
       }
     } else {
-      resultMsg.innerHTML = '⚠️ Não foi possível extrair o conteúdo completo. Tente: recarregar a página, aguardar o carregamento total do processo ou abrir o documento (sentença, petição) antes de extrair.';
-      resultadoPre.innerHTML = 'Nenhum texto significativo foi encontrado.';
+      resultMsg.innerHTML = '⚠️ Nenhum texto significativo encontrado.';
+      resultadoPre.innerHTML = 'Certifique-se de que:\n';
+      resultadoPre.innerHTML += '1. Você está em um processo do PJe.\n';
+      resultadoPre.innerHTML += '2. O documento está aberto (clique no link da sentença, petição, etc.).\n';
+      resultadoPre.innerHTML += '3. Aguarde o carregamento completo da página/iframe.\n';
+      resultadoPre.innerHTML += '4. Tente novamente.';
     }
   } catch(e) {
     console.error('Erro na extração:', e);

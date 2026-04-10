@@ -1,16 +1,16 @@
 // ============================================
-// CONTENT.JS - EXTRAÇÃO OTIMIZADA (ÍNTEGRA + IFRAMES)
+// CONTENT.JS - EXTRAÇÃO ULTRA OTIMIZADA (ÍNTEGRA + IFRAMES ANINHADOS)
 // ============================================
 
 // Aguarda o carregamento completo da página (incluindo iframes)
 function aguardarCarregamento() {
   return new Promise((resolve) => {
     let tentativas = 0;
-    const maxTentativas = 40; // ~20 segundos (para páginas lentas)
+    const maxTentativas = 60; // ~30 segundos (páginas muito lentas)
     const intervalo = setInterval(() => {
       tentativas++;
-      // Verifica se há conteúdo significativo (aumentado para 5000)
-      if (document.body.innerText.length > 5000 || tentativas >= maxTentativas) {
+      // Verifica se há conteúdo significativo (aumentado para 10000)
+      if (document.body.innerText.length > 10000 || tentativas >= maxTentativas) {
         clearInterval(intervalo);
         resolve();
       }
@@ -18,20 +18,23 @@ function aguardarCarregamento() {
   });
 }
 
-// Obtém o documento com MAIS texto (entre todos os iframes e o documento principal)
-function getMelhorDocumento() {
-  let melhorDoc = document;
-  let melhorTexto = document.body.innerText.length;
-  const iframes = document.querySelectorAll('iframe');
+// Obtém o documento com MAIS texto (recursivo em iframes aninhados)
+function getMelhorDocumentoRecursivo(elemento) {
+  let melhorDoc = elemento || document;
+  let melhorTexto = (elemento?.body?.innerText?.length) || document.body.innerText.length;
+  const iframes = (elemento || document).querySelectorAll('iframe');
   for (const iframe of iframes) {
     try {
       const doc = iframe.contentDocument;
-      if (doc && doc.body && doc.body.innerText.length > melhorTexto) {
-        melhorTexto = doc.body.innerText.length;
-        melhorDoc = doc;
+      if (doc && doc.body) {
+        // Tenta recursivamente dentro deste iframe
+        const docRecursivo = getMelhorDocumentoRecursivo(doc);
+        if (docRecursivo.body.innerText.length > melhorTexto) {
+          melhorTexto = docRecursivo.body.innerText.length;
+          melhorDoc = docRecursivo;
+        }
       }
     } catch (e) {
-      // Erro de cross‑origin – ignora esse iframe
       console.warn('Não foi possível acessar iframe (cross‑origin):', e);
     }
   }
@@ -113,11 +116,11 @@ function extrairTextoCompleto(doc) {
 
 // Função principal
 async function extrairDados() {
-  console.log('🔄 Aguardando carregamento completo da página e iframes...');
+  console.log('🔄 Aguardando carregamento completo da página e iframes aninhados...');
   await aguardarCarregamento();
-  await new Promise(r => setTimeout(r, 3000)); // segurança extra
+  await new Promise(r => setTimeout(r, 5000)); // segurança extra (5 segundos)
 
-  const doc = getMelhorDocumento(); // pega o documento com mais texto
+  const doc = getMelhorDocumentoRecursivo(document); // recursivo em iframes
   const textoCompleto = extrairTextoCompleto(doc);
   const numero = extrairNumero(doc);
   const tribunal = extrairTribunal();
@@ -147,4 +150,4 @@ chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
   }
 });
 
-console.log('🚀 Content Script (versão otimizada) carregado');
+console.log('🚀 Content Script (ultra otimizado) carregado');

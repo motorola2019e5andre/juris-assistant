@@ -13,13 +13,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
       
       try {
-        // Injeta o content.js se necessário
+        // Injeta o content.js em todos os frames (incluindo iframes)
         await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
+          target: { tabId: tab.id, allFrames: true },
           files: ['content.js']
         });
         
-        // Aguarda um pouco e então envia a mensagem
+        // Aguarda o carregamento do conteúdo (aumentado para 2000ms)
         setTimeout(async () => {
           try {
             const results = await chrome.tabs.sendMessage(tab.id, { action: 'extrairProcesso' });
@@ -27,7 +27,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           } catch (err) {
             sendResponse({ error: 'Erro ao extrair: ' + err.message });
           }
-        }, 500);
+        }, 2000);
         
       } catch (error) {
         sendResponse({ error: 'Erro ao injetar script: ' + error.message });
