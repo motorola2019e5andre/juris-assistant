@@ -1,171 +1,122 @@
 // ============================================
-// CONTENT.JS - Extrai TODO o conteúdo da página
+// CONTENT.JS - Extrai dados do processo PJe (VERSÃO MELHORADA)
 // ============================================
 
-// Função para aguardar a página carregar
-function aguardarCarregamento() {
+// 🔍 Obtém o documento correto (suporte a iframe)
+function getDocumentoCorreto() {
+  const iframe = document.querySelector('iframe');
+  if (iframe && iframe.contentDocument) {
+    return iframe.contentDocument;
+  }
+  return document;
+}
+
+// ⏳ Espera elemento carregar (para páginas dinâmicas)
+function esperarElemento(selector, timeout = 10000) {
   return new Promise((resolve) => {
-    // Verifica se já tem conteúdo
-    if (document.body.innerText.length > 500) {
-      resolve();
-      return;
-    }
-    
-    // Observa mudanças no DOM
-    const observer = new MutationObserver(() => {
-      if (document.body.innerText.length > 500) {
-        observer.disconnect();
-        resolve();
+    const interval = setInterval(() => {
+      const el = document.querySelector(selector);
+      if (el) {
+        clearInterval(interval);
+        resolve(el);
       }
-    });
-    
-    observer.observe(document.body, { childList: true, subtree: true });
-    
-    // Timeout de segurança
-    setTimeout(() => {
-      observer.disconnect();
-      resolve();
-    }, 10000);
+    }, 500);
+
+    setTimeout(() => clearInterval(interval), timeout);
   });
 }
 
-// Extrai o número do processo (se houver)
+// 🔢 Extrai número do processo
 function extrairNumeroProcesso() {
-  const text = document.body.innerText;
-  const regex = /\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/;
+  const doc = getDocumentoCorreto();
+  const text = doc.body.innerText;
+
+  const regex = /\d{7}-?\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/;
   const match = text.match(regex);
+
   return match ? match[0] : null;
 }
 
-// Extrai o título da página
-function extrairTitulo() {
-  return document.title || 'Sem título';
+// 🏛️ Extrai tribunal
+function extrairTribunal() {
+  const url = window.location.href;
+
+  if (url.includes('pje.tst.jus.br')) return 'TST';
+  if (url.includes('pje.trt1')) return 'TRT 1ª Região (RJ)';
+  if (url.includes('pje.trt2')) return 'TRT 2ª Região (SP)';
+  if (url.includes('pje.trt3')) return 'TRT 3ª Região (MG)';
+  if (url.includes('pje.trt4')) return 'TRT 4ª Região (RS)';
+  if (url.includes('pje.trt15')) return 'TRT 15ª Região (SP)';
+  if (url.includes('pje.trt18')) return 'TRT 18ª Região (GO)';
+
+  return 'Tribunal não identificado';
 }
 
-// Extrai a URL
-function extrairUrl() {
-  return window.location.href;
-}
+// 📜 Extrai andamento/movimentações (mais robusto)
+function extrairAndamento() {
+  const doc = getDocumentoCorreto();
 
-// EXTRAI TODO O TEXTO VISÍVEL DA PÁGINA
-function extrairTextoVisivel() {
-  // Remove scripts e estilos
-  const clones = document.body.cloneNode(true);
-  const scripts = clones.querySelectorAll('script, style, noscript');
-  scripts.forEach(el => el.remove());
-  
-  // Pega o texto limpo
-  let texto = clones.innerText || clones.textContent || '';
-  
-  // Limpa linhas vazias excessivas
-  texto = texto.replace(/\n\s*\n\s*\n/g, '\n\n');
-  
-  return texto;
-}
+  // tenta encontrar tabelas (comum no PJe)
+  const tabelas = doc.querySelectorAll('table');
 
-// Extrai todo o HTML da página (opcional)
-function extrairHtml() {
-  return document.documentElement.outerHTML;
-}
+  for (const tabela of tabelas) {
+    const texto = tabela.innerText;
 
-// Extrai informações da página
-function extrairMetadados() {
-  const metadados = {};
-  
-  // Tenta pegar meta tags
-  const metaTags = document.querySelectorAll('meta');
-  metaTags.forEach(tag => {
-    const name = tag.getAttribute('name') || tag.getAttribute('property');
-    const content = tag.getAttribute('content');
-    if (name && content) {
-      metadados[name] = content;
+    if (
+      texto.includes('Movimentação') ||
+      texto.includes('Andamento') ||
+      texto.length > 200
+    ) {
+      return texto;
     }
-  });
-  
-  return metadados;
+  }
+
+  // fallback
+  return doc.body.innerText.substring(0, 3000);
 }
 
-// Extrai links da página
-function extrairLinks() {
-  const links = [];
-  const elementos = document.querySelectorAll('a[href]');
-  elementos.forEach(el => {
-    const href = el.href;
-    const texto = el.innerText || '';
-    if (href && !href.startsWith('javascript:')) {
-      links.push({ texto: texto.substring(0, 100), url: href });
-    }
-  });
-  return links.slice(0, 50); // Limita a 50 links
-}
+// 👥 Extrai partes (mais flexível)
+function extrairPartes() {
+  const doc = getDocumentoCorreto();
+  const text = doc.body.innerText;
 
-// Extrai imagens da página
-function extrairImagens() {
-  const imagens = [];
-  const elementos = document.querySelectorAll('img[src]');
-  elementos.forEach(el => {
-    const src = el.src;
-    if (src) {
-      imagens.push(src);
-    }
-  });
-  return imagens.slice(0, 20); // Limita a 20 imagens
-}
+  return {
+    reclamante:
+      (text.match(/(RECLAMANTE|AUTOR|POLO ATIVO):?\s*([^\n]+)/i) || [])[2] || '',
 
-// Função principal
-async function extrairDadosCompletos() {
-  console.log('🔄 Aguardando carregamento da página...');
-  
-  await aguardarCarregamento();
-  
-  console.log('📄 Extraindo todo o conteúdo da página...');
-  
-  const textoVisivel = extrairTextoVisivel();
-  const html = extrairHtml();
-  
-  console.log(`✅ Texto extraído: ${textoVisivel.length} caracteres`);
-  
-  const dados = {
-    // Informações básicas
-    url: extrairUrl(),
-    titulo: extrairTitulo(),
-    numeroProcesso: extrairNumeroProcesso(),
-    dataExtracao: new Date().toISOString(),
-    
-    // Conteúdo
-    textoCompleto: textoVisivel,
-    html: html.substring(0, 50000), // Limita para não sobrecarregar
-    
-    // Metadados
-    metadados: extrairMetadados(),
-    
-    // Links e imagens
-    links: extrairLinks(),
-    imagens: extrairImagens(),
-    
-    // Estatísticas
-    estatisticas: {
-      tamanhoTexto: textoVisivel.length,
-      tamanhoHtml: html.length,
-      numeroLinks: extrairLinks().length,
-      numeroImagens: extrairImagens().length
-    }
+    reclamado:
+      (text.match(/(RECLAMADO|RÉU|REU|POLO PASSIVO):?\s*([^\n]+)/i) || [])[2] || ''
   };
-  
+}
+
+// 📦 Função principal
+async function extrairDadosCompletos() {
+  console.log('🔄 Extraindo dados do processo...');
+
+  // espera a página carregar melhor
+  await esperarElemento('body');
+
+  const dados = {
+    numero: extrairNumeroProcesso(),
+    tribunal: extrairTribunal(),
+    partes: extrairPartes(),
+    andamento: extrairAndamento(),
+    url: window.location.href,
+    titulo: document.title,
+    dataExtracao: new Date().toISOString()
+  };
+
+  console.log('✅ Dados extraídos:', dados);
+
   return dados;
 }
 
-// Listener para mensagens
+// 📡 Listener (corrigido para async)
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'extrairProcesso') {
-    extrairDadosCompletos().then(dados => {
-      sendResponse(dados);
-    }).catch(err => {
-      console.error('Erro:', err);
-      sendResponse({ error: err.message });
-    });
-    return true;
+    extrairDadosCompletos().then(sendResponse);
+    return true; // mantém canal aberto
   }
 });
 
-console.log('🚀 Juris Assistant - Content script carregado (extração total da página)');
+console.log('🚀 Juris Assistant - Content script carregado (versão melhorada)');
