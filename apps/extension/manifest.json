@@ -1,45 +1,33 @@
 {
   "manifest_version": 3,
   "name": "Juris Assistant",
-  "version": "2.0.0",
-  "description": "Assistente jurídico com IA",
-  "permissions": ["storage", "activeTab", "tabs", "scripting", "sidePanel"],
+  "version": "1.0.0",
+  "description": "Assistente jurídico com IA para TRT, TRF e EPROC",
+  "permissions": ["storage", "sidePanel", "activeTab", "scripting"],
   "host_permissions": [
-    "http://localhost:3333/*",
-    "https://juris-assistant-api.onrender.com/*",
-    "https://pje.tst.jus.br/*",
-    "https://pje.trt1.jus.br/*",
-    "https://pje.trt2.jus.br/*",
-    "https://pje.trt3.jus.br/*",
-    "https://pje.trt4.jus.br/*",
-    "https://pje.trt5.jus.br/*",
-    "https://pje.trt6.jus.br/*",
-    "https://pje.trt7.jus.br/*",
-    "https://pje.trt8.jus.br/*",
-    "https://pje.trt9.jus.br/*",
-    "https://pje.trt10.jus.br/*",
-    "https://pje.trt11.jus.br/*",
-    "https://pje.trt12.jus.br/*",
-    "https://pje.trt13.jus.br/*",
-    "https://pje.trt14.jus.br/*",
-    "https://pje.trt15.jus.br/*",
-    "https://pje.trt16.jus.br/*",
-    "https://pje.trt17.jus.br/*",
-    "https://pje.trt18.jus.br/*",
-    "https://pje.trt19.jus.br/*",
-    "https://pje.trt20.jus.br/*",
-    "https://pje.trt21.jus.br/*",
-    "https://pje.trt22.jus.br/*",
-    "https://pje.trt23.jus.br/*",
-    "https://pje.trt24.jus.br/*"
+    "https://juris-assistant-api.onrender.com/",
+    "https://*.trt.jus.br/*",
+    "https://*.trf.jus.br/*",
+    "https://*.eproc.trf*.jus.br/*"
   ],
+  "action": {
+    "default_title": "Juris Assistant",
+    "default_popup": "popup.html"
+  },
   "side_panel": {
     "default_path": "sidepanel.html"
   },
   "background": {
     "service_worker": "background.js"
   },
-  "action": {
-    "default_title": "Juris Assistant"
-  }
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.trt.jus.br/*",
+        "https://*.trf.jus.br/*",
+        "https://*.eproc.trf*.jus.br/*"
+      ],
+      "js": ["content.js"]
+    }
+  ]
 }
