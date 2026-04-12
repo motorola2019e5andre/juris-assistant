@@ -1,5 +1,5 @@
 // ============================================
-// BACKGROUND.JS - Extração de todos os documentos
+// BACKGROUND.JS - Extração de todos os documentos (com logs)
 // ============================================
 
 chrome.action.onClicked.addListener((tab) => {
@@ -11,7 +11,7 @@ async function extrairDocumento(url) {
   return new Promise((resolve) => {
     chrome.tabs.create({ url: url, active: false }, async (tab) => {
       let tentativas = 0;
-      const maxTentativas = 20; // 10 segundos
+      const maxTentativas = 20;
       const intervalo = setInterval(async () => {
         tentativas++;
         try {
@@ -26,9 +26,7 @@ async function extrairDocumento(url) {
             resolve({ texto: resultado.texto, url: url });
             return;
           }
-        } catch(e) {
-          // Ignora erros temporários
-        }
+        } catch(e) {}
         if (tentativas >= maxTentativas) {
           clearInterval(intervalo);
           chrome.tabs.remove(tab.id);
@@ -41,16 +39,17 @@ async function extrairDocumento(url) {
 
 // Extrai todos os documentos de uma lista de URLs (sequencial)
 async function extrairTodosDocumentos(urls, sendResponse) {
+  console.log('[Background] extrairTodosDocumentos iniciado, total de URLs:', urls.length);
   const resultados = [];
   for (let i = 0; i < urls.length; i++) {
     const link = urls[i];
-    // Opcional: envia progresso (pode ser ignorado pelo sidepanel)
+    console.log(`[Background] Extraindo documento ${i+1}/${urls.length}: ${link.titulo}`);
     chrome.runtime.sendMessage({
       action: 'progressoExtração',
       current: i + 1,
       total: urls.length,
       titulo: link.titulo
-    }).catch(() => {}); // ignora se não houver receptor
+    }).catch(() => {});
     const resultado = await extrairDocumento(link.url);
     resultados.push({
       titulo: link.titulo,
@@ -59,13 +58,17 @@ async function extrairTodosDocumentos(urls, sendResponse) {
       url: link.url
     });
   }
+  console.log('[Background] extrairTodosDocumentos finalizado');
   sendResponse({ documentos: resultados });
 }
 
 // Listener principal
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.log('[Background] Mensagem recebida, action:', request.action);
+
   // Extração normal da página atual
   if (request.action === 'extrairProcesso') {
+    console.log('[Background] Processando extrairProcesso');
     chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
       const tab = tabs[0];
       if (!tab || !tab.id) {
@@ -98,6 +101,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   // Extração em massa de todos os documentos
   if (request.action === 'extrairTodosDocumentos') {
+    console.log('[Background] Processando extrairTodosDocumentos');
     const urls = request.urls;
     if (!urls || urls.length === 0) {
       sendResponse({ error: 'Nenhum documento encontrado' });
@@ -107,7 +111,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  // Qualquer outra ação pode ser ignorada ou respondida com erro
+  // Qualquer outra ação
+  console.warn('[Background] Ação desconhecida:', request.action);
   sendResponse({ error: 'Ação desconhecida' });
   return true;
 });
