@@ -3,8 +3,13 @@
   "name": "Juris Assistant",
   "version": "1.1",
   "description": "Assistente jurídico com IA",
-  "permissions": ["storage", "sidePanel", "activeTab", "scripting", "tabs"],
-  "host_permissions": ["<all_urls>"],
+  "permissions": ["storage", "activeTab", "tabs", "scripting", "sidePanel"],
+  "host_permissions": [
+    "https://juris-assistant-api.onrender.com/",
+    "https://*.trt.jus.br/*",
+    "https://*.trf.jus.br/*",
+    "https://pje.tst.jus.br/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
@@ -16,7 +21,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": ["https://*.trt.jus.br/*", "https://*.trf.jus.br/*", "https://pje.tst.jus.br/*"],
       "js": ["content.js"],
       "all_frames": true
     }

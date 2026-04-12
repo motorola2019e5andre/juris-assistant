@@ -1,5 +1,5 @@
 // ============================================
-// SIDEPANEL.JS - versão corrigida (apenas UI)
+// SIDEPANEL.JS - Versão completa com extração em massa
 // ============================================
 
 const API = 'https://juris-assistant-api.onrender.com';
@@ -8,7 +8,7 @@ const resultMsg = document.getElementById('resultMsg');
 const resultadoPre = document.getElementById('resultado');
 
 // ============================================
-// EXTRAIR PROCESSO (chama background.js)
+// EXTRAIR PROCESSO (página atual)
 // ============================================
 const extrairBtn = document.getElementById('extrairProcessoBtn');
 if (extrairBtn) {
@@ -47,7 +47,6 @@ if (extrairBtn) {
 
       resultadoPre.innerHTML = `🏛️ Tribunal: ${response.tribunal || 'Não identificado'}\n📋 Número: ${response.numero || 'Não identificado'}\n📊 Caracteres: ${caracteres}\n📅 Extraído: ${new Date().toLocaleString()}\n`;
 
-      // Exibir links de documentos, se houver
       if (response.linksDocumentos && response.linksDocumentos.length > 0) {
         resultadoPre.innerHTML += '\n📄 **Documentos encontrados (clique para abrir):**\n';
         for (const link of response.linksDocumentos) {
@@ -55,6 +54,62 @@ if (extrairBtn) {
         }
       }
     } catch (e) {
+      resultMsg.innerHTML = '❌ Erro: ' + e.message;
+    }
+  };
+}
+
+// ============================================
+// EXTRAIR TODOS OS ANDAMENTOS (MASSIVO)
+// ============================================
+const extrairTodosBtn = document.getElementById('extrairTodosBtn');
+if (extrairTodosBtn) {
+  extrairTodosBtn.onclick = async () => {
+    resultMsg.innerHTML = '🔍 Coletando lista de documentos...';
+    resultadoPre.innerHTML = '';
+
+    try {
+      // 1. Obtém a lista de links da página atual
+      const responseLinks = await chrome.runtime.sendMessage({ action: 'extrairLinksDocumentos' });
+      if (responseLinks.error) {
+        resultMsg.innerHTML = '❌ ' + responseLinks.error;
+        return;
+      }
+      const links = responseLinks.links;
+      if (!links || links.length === 0) {
+        resultMsg.innerHTML = '⚠️ Nenhum documento encontrado na página.';
+        return;
+      }
+
+      resultMsg.innerHTML = `🔄 Extraindo ${links.length} documentos. Isso pode levar alguns segundos...`;
+
+      // 2. Solicita a extração de todos os documentos
+      const response = await chrome.runtime.sendMessage({
+        action: 'extrairTodosDocumentos',
+        urls: links
+      });
+
+      if (response.error) {
+        resultMsg.innerHTML = '❌ ' + response.error;
+        return;
+      }
+
+      // 3. Monta o texto completo
+      const documentos = response.documentos;
+      let textoCompleto = '';
+      for (const doc of documentos) {
+        textoCompleto += `\n\n📄 === ${doc.titulo} (${doc.tipo}) ===\n${doc.texto}\n`;
+      }
+
+      if (textoCompleto && textoCompleto.length > 100) {
+        document.getElementById('texto').value = textoCompleto;
+        resultMsg.innerHTML = `✅ Extraídos ${documentos.length} documentos! Total: ${textoCompleto.length} caracteres.`;
+        resultadoPre.innerHTML = `📚 Documentos extraídos: ${documentos.length}\n📌 Caracteres totais: ${textoCompleto.length}`;
+      } else {
+        resultMsg.innerHTML = '⚠️ Nenhum texto significativo foi extraído.';
+      }
+    } catch (e) {
+      console.error(e);
       resultMsg.innerHTML = '❌ Erro: ' + e.message;
     }
   };

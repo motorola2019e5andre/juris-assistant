@@ -80,7 +80,7 @@ function limparTexto(texto) {
   return texto.replace(/\s+/g, ' ').replace(/\n\s+/g, '\n').trim();
 }
 
-// Extrai o texto completo do documento
+// Extrai o texto completo do documento (usado pela extração normal)
 function extrairTextoCompleto(doc) {
   if (!doc) return '';
   const seletores = [
@@ -100,7 +100,7 @@ function extrairTextoCompleto(doc) {
   return limparTexto(melhorTexto).substring(0, 120000);
 }
 
-// Detecta links de documentos na página (sentença, petição, etc.)
+// Detecta links de documentos na página (versão simples)
 function detectarLinksDocumentos() {
   const links = [];
   const palavrasChave = ['sentença', 'decisão', 'petição', 'contestação', 'recurso', 'acórdão'];
@@ -115,7 +115,80 @@ function detectarLinksDocumentos() {
   return links;
 }
 
-// Função principal de extração (chamada pela extensão)
+// ============================================
+// NOVAS FUNÇÕES PARA EXTRAÇÃO EM MASSA
+// ============================================
+
+// Extrai todos os links de documentos/andamentos da página
+function extrairLinksDocumentos() {
+  const links = [];
+  const seletores = [
+    'a[href*="download"]',
+    'a[href*="documento"]',
+    'a[href*="visualizar"]',
+    'a[href*="pdf"]',
+    '.movimentacao a',
+    '.andamento a',
+    '.timeline a',
+    'tr a',
+    'td a'
+  ];
+  const elementos = document.querySelectorAll(seletores.join(','));
+  for (const el of elementos) {
+    const href = el.href;
+    const texto = el.innerText || el.textContent || '';
+    if (href && href.startsWith('http') && !href.includes('login') && texto.length > 5) {
+      links.push({
+        url: href,
+        titulo: texto.trim(),
+        tipo: identificarTipoDocumento(texto, href)
+      });
+    }
+  }
+  // Remove duplicatas
+  const unicos = [];
+  const urlsVistas = new Set();
+  for (const link of links) {
+    if (!urlsVistas.has(link.url)) {
+      urlsVistas.add(link.url);
+      unicos.push(link);
+    }
+  }
+  return unicos;
+}
+
+// Identifica o tipo de documento pelo texto ou URL
+function identificarTipoDocumento(texto, url) {
+  const lower = texto.toLowerCase();
+  if (lower.includes('sentença')) return 'SENTENÇA';
+  if (lower.includes('petição inicial')) return 'PETIÇÃO INICIAL';
+  if (lower.includes('contestação')) return 'CONTESTAÇÃO';
+  if (lower.includes('recurso')) return 'RECURSO';
+  if (lower.includes('intimação')) return 'INTIMAÇÃO';
+  if (lower.includes('ata')) return 'ATA DE AUDIÊNCIA';
+  if (lower.includes('decisão')) return 'DECISÃO';
+  if (lower.includes('despacho')) return 'DESPACHO';
+  if (lower.includes('embargos')) return 'EMBARGOS';
+  if (url.includes('pdf')) return 'PDF';
+  return 'DOCUMENTO';
+}
+
+// Extrai todo o texto visível da página (para abas temporárias)
+function extrairTextoPagina() {
+  const seletores = ['main', '.conteudo', '.content', '#conteudo', '.documento', '.document-content', 'body'];
+  let melhorTexto = '';
+  for (const sel of seletores) {
+    const el = document.querySelector(sel);
+    if (el && el.innerText.length > melhorTexto.length) {
+      melhorTexto = el.innerText;
+    }
+  }
+  return melhorTexto || document.body.innerText;
+}
+
+// ============================================
+// FUNÇÃO PRINCIPAL DE EXTRAÇÃO (PÁGINA ATUAL)
+// ============================================
 async function extrairDadosCompletos() {
   console.log('Extraindo metadados e movimentações...');
   await aguardarCarregamento();
@@ -140,24 +213,49 @@ async function extrairDadosCompletos() {
   };
 }
 
-// Listener único para mensagens
+// ============================================
+// LISTENER ÚNICO (TRATA TODAS AS MENSAGENS)
+// ============================================
 chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
+  // Extração padrão (página atual)
   if (req.action === 'extrairProcesso') {
     extrairDadosCompletos()
       .then(sendResponse)
       .catch(err => sendResponse({ error: err.message }));
     return true;
   }
+
+  // Extração de texto de uma página (para abas temporárias)
   if (req.action === 'extrairTexto') {
     const texto = extrairTextoCompleto(document);
     sendResponse({ texto });
     return true;
   }
+
+  // Extração de texto de página (versão simplificada para abas temporárias)
+  if (req.action === 'extrairTextoPagina') {
+    const texto = extrairTextoPagina();
+    sendResponse({ texto });
+    return true;
+  }
+
+  // Obter seleção do usuário
   if (req.action === 'GET_SELECTION') {
     const text = window.getSelection()?.toString() || '';
     sendResponse({ text });
     return true;
   }
+
+  // Obter lista de links de documentos da página
+  if (req.action === 'extrairLinksDocumentos') {
+    const links = extrairLinksDocumentos();
+    sendResponse({ links, total: links.length });
+    return true;
+  }
+
+  // Se nenhuma ação conhecida
+  sendResponse({ error: 'Ação desconhecida' });
+  return true;
 });
 
-console.log('Juris Assistant - content script carregado');
+console.log('Juris Assistant - content script carregado (com extração em massa)');
