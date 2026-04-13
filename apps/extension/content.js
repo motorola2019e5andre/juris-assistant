@@ -1,5 +1,5 @@
 // ============================================
-// CONTENT.JS - EXTRAÇÃO OTIMIZADA FINAL (CORRIGIDO)
+// CONTENT.JS - EXTRAÇÃO OTIMIZADA FINAL (CORRIGIDO COM EXPANSÃO DE ANDAMENTOS)
 // ============================================
 
 // Aguarda carregamento da página
@@ -17,6 +17,187 @@ function aguardarCarregamento() {
     }, 400);
   });
 }
+
+// ============================================
+// FUNÇÕES DE EXPANSÃO (NOVO)
+// ============================================
+
+// Expande todos os accordions/árvores do PJE (Angular Material)
+async function expandirTodosAndamentos() {
+  console.log('[Content] Expandindo andamentos...');
+  
+  // Seletores comuns no PJE para botões de expandir
+  const botoesExpansao = [
+    'mat-icon-button[aria-label="Expandir"]',
+    'mat-icon-button .fa-plus',
+    'mat-icon-button .fa-chevron-down',
+    '.tree-toggle',
+    '.expand-button',
+    'button[title="Expandir"]',
+    '.accordion-header',
+    '.movimentacao .toggle',
+    '.tree .mat-icon-button',
+    'button.tree-node__toggle',
+    '.mat-expansion-panel-header',
+    '[data-toggle="collapse"]'
+  ];
+  
+  let expandiu = false;
+  for (const sel of botoesExpansao) {
+    const botoes = document.querySelectorAll(sel);
+    for (const btn of botoes) {
+      // Verifica se está visível e se não está já expandido
+      const parent = btn.closest('.mat-card, .tree-node, .movimentacao-item, .mat-expansion-panel');
+      const jaExpandido = parent?.getAttribute('aria-expanded') === 'true' ||
+                          parent?.classList?.contains('mat-expanded');
+      if (!jaExpandido && btn.offsetParent !== null) {
+        try {
+          btn.click();
+          expandiu = true;
+          await new Promise(r => setTimeout(r, 300));
+        } catch(e) {}
+      }
+    }
+  }
+  
+  // Repete recursivamente para sub-árvores
+  if (expandiu) {
+    await new Promise(r => setTimeout(r, 800));
+    await expandirTodosAndamentos();
+  }
+}
+
+// ============================================
+// EXTRAÇÃO DE LINKS COM EXPANSÃO PRÉVIA
+// ============================================
+
+// Versão assíncrona que expande antes de extrair
+async function extrairLinksDocumentosCompletos() {
+  // 1. Expande todos os andamentos
+  await expandirTodosAndamentos();
+  await new Promise(r => setTimeout(r, 1000)); // Aguarda renderização
+  
+  // 2. Coleta todos os links de documentos
+  const links = new Map();
+  const seletores = [
+    'a[href*="download"]',
+    'a[href*="documento"]',
+    'a[href*="visualizar"]',
+    'a[href*="pdf"]',
+    'a.linkVisualizar',
+    'a.linkDocumento',
+    '.movimentacao a',
+    '.andamento a',
+    '.tree a',
+    'tr a',
+    'td a',
+    'mat-card a',
+    '.documento-link',
+    'a[href*="documentoId"]',
+    'a[href*="idDocumento"]'
+  ];
+  
+  const elementos = document.querySelectorAll(seletores.join(','));
+  for (const el of elementos) {
+    let href = el.href;
+    let texto = (el.innerText || el.textContent || '').trim();
+    
+    // Torna URL absoluta se for relativa
+    if (href && href.startsWith('/')) {
+      href = window.location.origin + href;
+    }
+    
+    if (href && href.startsWith('http') && !href.includes('login') && texto.length > 3) {
+      if (!links.has(href)) {
+        links.set(href, {
+          url: href,
+          titulo: texto.substring(0, 100),
+          tipo: identificarTipoDocumento(texto, href)
+        });
+      }
+    }
+  }
+  
+  // 3. Se ainda não encontrou nada, tenta buscar em iframes
+  if (links.size === 0) {
+    const iframes = document.querySelectorAll('iframe');
+    for (const iframe of iframes) {
+      try {
+        const doc = iframe.contentDocument;
+        if (doc && doc.body) {
+          const linksIframe = extrairLinksDoDocumento(doc);
+          for (const link of linksIframe) {
+            if (!links.has(link.url)) links.set(link.url, link);
+          }
+        }
+      } catch(e) {}
+    }
+  }
+  
+  console.log(`[Content] Total de links encontrados: ${links.size}`);
+  return Array.from(links.values());
+}
+
+// Função auxiliar para extrair links de um documento qualquer
+function extrairLinksDoDocumento(doc) {
+  const links = [];
+  const elementos = doc.querySelectorAll('a[href]');
+  for (const el of elementos) {
+    let href = el.href;
+    let texto = (el.innerText || '').trim();
+    if (href && href.startsWith('http') && texto.length > 3) {
+      links.push({
+        url: href,
+        titulo: texto.substring(0, 100),
+        tipo: identificarTipoDocumento(texto, href)
+      });
+    }
+  }
+  return links;
+}
+
+// Mantém a função síncrona original para compatibilidade (mas será substituída)
+function extrairLinksDocumentos() {
+  // Versão síncrona simples (sem expansão) – manter por enquanto
+  const links = [];
+  const seletores = [
+    'a[href*="download"]',
+    'a[href*="documento"]',
+    'a[href*="visualizar"]',
+    'a[href*="pdf"]',
+    '.movimentacao a',
+    '.andamento a',
+    '.timeline a',
+    'tr a',
+    'td a'
+  ];
+  const elementos = document.querySelectorAll(seletores.join(','));
+  for (const el of elementos) {
+    const href = el.href;
+    const texto = el.innerText || el.textContent || '';
+    if (href && href.startsWith('http') && !href.includes('login') && texto.length > 5) {
+      links.push({
+        url: href,
+        titulo: texto.trim(),
+        tipo: identificarTipoDocumento(texto, href)
+      });
+    }
+  }
+  // Remove duplicatas
+  const unicos = [];
+  const urlsVistas = new Set();
+  for (const link of links) {
+    if (!urlsVistas.has(link.url)) {
+      urlsVistas.add(link.url);
+      unicos.push(link);
+    }
+  }
+  return unicos;
+}
+
+// ============================================
+// DEMAIS FUNÇÕES (PERMANECEM IGUAIS)
+// ============================================
 
 // Obtém o documento com mais texto (recursivo em iframes)
 function getMelhorDocumentoRecursivo(elemento, depth = 0) {
@@ -115,48 +296,6 @@ function detectarLinksDocumentos() {
   return links;
 }
 
-// ============================================
-// NOVAS FUNÇÕES PARA EXTRAÇÃO EM MASSA
-// ============================================
-
-// Extrai todos os links de documentos/andamentos da página
-function extrairLinksDocumentos() {
-  const links = [];
-  const seletores = [
-    'a[href*="download"]',
-    'a[href*="documento"]',
-    'a[href*="visualizar"]',
-    'a[href*="pdf"]',
-    '.movimentacao a',
-    '.andamento a',
-    '.timeline a',
-    'tr a',
-    'td a'
-  ];
-  const elementos = document.querySelectorAll(seletores.join(','));
-  for (const el of elementos) {
-    const href = el.href;
-    const texto = el.innerText || el.textContent || '';
-    if (href && href.startsWith('http') && !href.includes('login') && texto.length > 5) {
-      links.push({
-        url: href,
-        titulo: texto.trim(),
-        tipo: identificarTipoDocumento(texto, href)
-      });
-    }
-  }
-  // Remove duplicatas
-  const unicos = [];
-  const urlsVistas = new Set();
-  for (const link of links) {
-    if (!urlsVistas.has(link.url)) {
-      urlsVistas.add(link.url);
-      unicos.push(link);
-    }
-  }
-  return unicos;
-}
-
 // Identifica o tipo de documento pelo texto ou URL
 function identificarTipoDocumento(texto, url) {
   const lower = texto.toLowerCase();
@@ -246,10 +385,12 @@ chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
     return true;
   }
 
-  // Obter lista de links de documentos da página
+  // Obter lista de links de documentos da página (VERSÃO CORRIGIDA COM EXPANSÃO)
   if (req.action === 'extrairLinksDocumentos') {
-    const links = extrairLinksDocumentos();
-    sendResponse({ links, total: links.length });
+    (async () => {
+      const links = await extrairLinksDocumentosCompletos();
+      sendResponse({ links, total: links.length });
+    })();
     return true;
   }
 
@@ -258,4 +399,4 @@ chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
   return true;
 });
 
-console.log('Juris Assistant - content script carregado (com extração em massa)');
+console.log('Juris Assistant - content script carregado (com expansão de andamentos)');
