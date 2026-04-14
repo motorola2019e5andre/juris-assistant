@@ -1,5 +1,5 @@
 // ============================================
-// BACKGROUND.JS - Extração de todos os documentos (com logs)
+// BACKGROUND.JS - Extração de todos os documentos (com logs e melhorias)
 // ============================================
 
 chrome.action.onClicked.addListener((tab) => {
@@ -11,14 +11,16 @@ async function extrairDocumento(url) {
   return new Promise((resolve) => {
     chrome.tabs.create({ url: url, active: false }, async (tab) => {
       let tentativas = 0;
-      const maxTentativas = 20;
+      const maxTentativas = 40;        // Aumentado (antes 20)
       const intervalo = setInterval(async () => {
         tentativas++;
         try {
+          // Injeta o content script na aba temporária
           await chrome.scripting.executeScript({
             target: { tabId: tab.id },
             files: ['content.js']
           });
+          // Solicita extração do texto da página
           const resultado = await chrome.tabs.sendMessage(tab.id, { action: 'extrairTextoPagina' });
           if (resultado && resultado.texto && resultado.texto.length > 100) {
             clearInterval(intervalo);
@@ -26,38 +28,51 @@ async function extrairDocumento(url) {
             resolve({ texto: resultado.texto, url: url });
             return;
           }
-        } catch(e) {}
+        } catch(e) {
+          // Ignora erros temporários (script ainda não pronto)
+        }
         if (tentativas >= maxTentativas) {
           clearInterval(intervalo);
           chrome.tabs.remove(tab.id);
-          resolve({ texto: '', url: url, erro: 'Timeout' });
+          resolve({ texto: '', url: url, erro: 'Timeout após ' + maxTentativas + ' tentativas' });
         }
-      }, 500);
+      }, 800); // Aumentado de 500ms para 800ms
     });
   });
 }
 
-// Extrai todos os documentos de uma lista de URLs (sequencial)
+// Extrai todos os documentos de uma lista de URLs (sequencial com delay)
 async function extrairTodosDocumentos(urls, sendResponse) {
   console.log('[Background] extrairTodosDocumentos iniciado, total de URLs:', urls.length);
   const resultados = [];
+  
   for (let i = 0; i < urls.length; i++) {
     const link = urls[i];
     console.log(`[Background] Extraindo documento ${i+1}/${urls.length}: ${link.titulo}`);
+    
+    // Envia progresso para o sidepanel (opcional)
     chrome.runtime.sendMessage({
       action: 'progressoExtração',
       current: i + 1,
       total: urls.length,
       titulo: link.titulo
-    }).catch(() => {});
+    }).catch(() => {}); // sidepanel pode estar fechado, ignora erro
+    
     const resultado = await extrairDocumento(link.url);
     resultados.push({
       titulo: link.titulo,
       tipo: link.tipo,
-      texto: resultado.texto,
-      url: link.url
+      texto: resultado.texto || '',
+      url: link.url,
+      erro: resultado.erro || null
     });
+    
+    // Delay entre requisições para não sobrecarregar o servidor/judiciário
+    if (i < urls.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
   }
+  
   console.log('[Background] extrairTodosDocumentos finalizado');
   sendResponse({ documentos: resultados });
 }

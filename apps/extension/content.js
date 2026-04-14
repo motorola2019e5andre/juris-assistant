@@ -1,5 +1,5 @@
 // ============================================
-// CONTENT.JS - EXTRAÇÃO OTIMIZADA FINAL (CORRIGIDO COM EXPANSÃO DE ANDAMENTOS)
+// CONTENT.JS - EXTRAÇÃO MASSIVA COM EXPANSÃO TOTAL E SCROLL
 // ============================================
 
 // Aguarda carregamento da página
@@ -19,38 +19,76 @@ function aguardarCarregamento() {
 }
 
 // ============================================
-// FUNÇÕES DE EXPANSÃO (NOVO)
+// ROLAGEM PARA CARREGAR MAIS ITENS (LAZY LOADING)
 // ============================================
+async function rolarAteOFim() {
+  console.log('[Content] Rolando página para carregar mais andamentos...');
+  let alturaAnterior = 0;
+  let scrolls = 0;
+  const maxScrolls = 20;
+  while (scrolls < maxScrolls) {
+    window.scrollTo(0, document.body.scrollHeight);
+    await new Promise(r => setTimeout(r, 1000));
+    const novaAltura = document.body.scrollHeight;
+    if (novaAltura === alturaAnterior) break;
+    alturaAnterior = novaAltura;
+    scrolls++;
+  }
+  console.log('[Content] Rolagem finalizada.');
+}
 
-// Expande todos os accordions/árvores do PJE (Angular Material)
-async function expandirTodosAndamentos() {
-  console.log('[Content] Expandindo andamentos...');
+// ============================================
+// EXPANSÃO TOTAL DE ANDAMENTOS (VERSÃO EXTREMA)
+// ============================================
+async function expandirTudo() {
+  console.log('[Content] Iniciando expansão de andamentos...');
   
-  // Seletores comuns no PJE para botões de expandir
-  const botoesExpansao = [
+  // Lista ampliada de seletores de botões de expansão
+  const seletoresExpansao = [
+    'button[aria-label="Expandir"]',
+    'button[aria-label="expandir"]',
     'mat-icon-button[aria-label="Expandir"]',
-    'mat-icon-button .fa-plus',
-    'mat-icon-button .fa-chevron-down',
-    '.tree-toggle',
-    '.expand-button',
-    'button[title="Expandir"]',
-    '.accordion-header',
-    '.movimentacao .toggle',
-    '.tree .mat-icon-button',
-    'button.tree-node__toggle',
-    '.mat-expansion-panel-header',
-    '[data-toggle="collapse"]'
+    '.fa-plus', '.fa-chevron-down', '.fa-angle-down',
+    '.tree-toggle', '.expand-button', '.accordion-toggle',
+    '[data-toggle="collapse"]', '.mat-expansion-panel-header',
+    '.tree-node__toggle', '.movimentacao .toggle', '.andamento .toggle',
+    'img[alt="Expandir"]', 'a[title="Expandir"]',
+    'button:has(> .fa-plus)', 'button:has(> .fa-chevron-down)',
+    '.mat-icon-button', '.expand-icon'
   ];
   
-  let expandiu = false;
-  for (const sel of botoesExpansao) {
-    const botoes = document.querySelectorAll(sel);
-    for (const btn of botoes) {
-      // Verifica se está visível e se não está já expandido
-      const parent = btn.closest('.mat-card, .tree-node, .movimentacao-item, .mat-expansion-panel');
-      const jaExpandido = parent?.getAttribute('aria-expanded') === 'true' ||
-                          parent?.classList?.contains('mat-expanded');
-      if (!jaExpandido && btn.offsetParent !== null) {
+  let expandiu = true;
+  let iteracoes = 0;
+  const maxIteracoes = 10;
+  
+  while (expandiu && iteracoes < maxIteracoes) {
+    expandiu = false;
+    iteracoes++;
+    
+    for (const sel of seletoresExpansao) {
+      const botoes = document.querySelectorAll(sel);
+      for (const btn of botoes) {
+        // Verifica se está visível e se o elemento pai não está expandido
+        const parent = btn.closest('.mat-expansion-panel, .tree-node, .movimentacao-item, .andamento-item, .card');
+        const estaExpandido = parent?.getAttribute('aria-expanded') === 'true' ||
+                              parent?.classList?.contains('mat-expanded') ||
+                              parent?.classList?.contains('open');
+        
+        if (!estaExpandido && btn.offsetParent !== null) {
+          try {
+            btn.click();
+            expandiu = true;
+            await new Promise(r => setTimeout(r, 300));
+          } catch(e) {}
+        }
+      }
+    }
+    
+    // Força clique em qualquer elemento que contenha ícone de "+" ou "expandir"
+    const icones = document.querySelectorAll('i.fa-plus, i.fa-chevron-down, span:contains("Expandir")');
+    for (const icon of icones) {
+      const btn = icon.closest('button') || icon;
+      if (btn.offsetParent !== null) {
         try {
           btn.click();
           expandiu = true;
@@ -58,32 +96,33 @@ async function expandirTodosAndamentos() {
         } catch(e) {}
       }
     }
+    
+    await new Promise(r => setTimeout(r, 500));
   }
   
-  // Repete recursivamente para sub-árvores
-  if (expandiu) {
-    await new Promise(r => setTimeout(r, 800));
-    await expandirTodosAndamentos();
-  }
+  console.log('[Content] Expansão concluída após', iteracoes, 'iterações.');
 }
 
 // ============================================
-// EXTRAÇÃO DE LINKS COM EXPANSÃO PRÉVIA
+// EXTRAÇÃO DE LINKS APÓS EXPANSÃO E ROLAGEM
 // ============================================
-
-// Versão assíncrona que expande antes de extrair
-async function extrairLinksDocumentosCompletos() {
-  // 1. Expande todos os andamentos
-  await expandirTodosAndamentos();
-  await new Promise(r => setTimeout(r, 1000)); // Aguarda renderização
+async function extrairLinksCompletos() {
+  // 1. Rolar para carregar lazy loading
+  await rolarAteOFim();
   
-  // 2. Coleta todos os links de documentos
+  // 2. Expandir todos os andamentos
+  await expandirTudo();
+  await new Promise(r => setTimeout(r, 1500));
+  
+  // 3. Coletar links
   const links = new Map();
   const seletores = [
     'a[href*="download"]',
     'a[href*="documento"]',
     'a[href*="visualizar"]',
     'a[href*="pdf"]',
+    'a[href*="idDocumento"]',
+    'a[href*="documentoId"]',
     'a.linkVisualizar',
     'a.linkDocumento',
     '.movimentacao a',
@@ -93,38 +132,38 @@ async function extrairLinksDocumentosCompletos() {
     'td a',
     'mat-card a',
     '.documento-link',
-    'a[href*="documentoId"]',
-    'a[href*="idDocumento"]'
+    'a[target="_blank"]'
   ];
   
   const elementos = document.querySelectorAll(seletores.join(','));
+  console.log(`[Content] Encontrados ${elementos.length} elementos candidatos a link.`);
+  
   for (const el of elementos) {
     let href = el.href;
     let texto = (el.innerText || el.textContent || '').trim();
     
-    // Torna URL absoluta se for relativa
     if (href && href.startsWith('/')) {
       href = window.location.origin + href;
     }
     
-    if (href && href.startsWith('http') && !href.includes('login') && texto.length > 3) {
+    if (href && href.startsWith('http') && !href.includes('login') && texto.length > 2) {
       if (!links.has(href)) {
         links.set(href, {
           url: href,
-          titulo: texto.substring(0, 100),
+          titulo: texto.substring(0, 120),
           tipo: identificarTipoDocumento(texto, href)
         });
       }
     }
   }
   
-  // 3. Se ainda não encontrou nada, tenta buscar em iframes
+  // 4. Se ainda não encontrou nada, busca dentro de iframes
   if (links.size === 0) {
     const iframes = document.querySelectorAll('iframe');
     for (const iframe of iframes) {
       try {
         const doc = iframe.contentDocument;
-        if (doc && doc.body) {
+        if (doc) {
           const linksIframe = extrairLinksDoDocumento(doc);
           for (const link of linksIframe) {
             if (!links.has(link.url)) links.set(link.url, link);
@@ -134,21 +173,20 @@ async function extrairLinksDocumentosCompletos() {
     }
   }
   
-  console.log(`[Content] Total de links encontrados: ${links.size}`);
+  console.log(`[Content] Total final de links únicos: ${links.size}`);
   return Array.from(links.values());
 }
 
-// Função auxiliar para extrair links de um documento qualquer
 function extrairLinksDoDocumento(doc) {
   const links = [];
   const elementos = doc.querySelectorAll('a[href]');
   for (const el of elementos) {
     let href = el.href;
     let texto = (el.innerText || '').trim();
-    if (href && href.startsWith('http') && texto.length > 3) {
+    if (href && href.startsWith('http') && texto.length > 2) {
       links.push({
         url: href,
-        titulo: texto.substring(0, 100),
+        titulo: texto.substring(0, 120),
         tipo: identificarTipoDocumento(texto, href)
       });
     }
@@ -156,50 +194,9 @@ function extrairLinksDoDocumento(doc) {
   return links;
 }
 
-// Mantém a função síncrona original para compatibilidade (mas será substituída)
-function extrairLinksDocumentos() {
-  // Versão síncrona simples (sem expansão) – manter por enquanto
-  const links = [];
-  const seletores = [
-    'a[href*="download"]',
-    'a[href*="documento"]',
-    'a[href*="visualizar"]',
-    'a[href*="pdf"]',
-    '.movimentacao a',
-    '.andamento a',
-    '.timeline a',
-    'tr a',
-    'td a'
-  ];
-  const elementos = document.querySelectorAll(seletores.join(','));
-  for (const el of elementos) {
-    const href = el.href;
-    const texto = el.innerText || el.textContent || '';
-    if (href && href.startsWith('http') && !href.includes('login') && texto.length > 5) {
-      links.push({
-        url: href,
-        titulo: texto.trim(),
-        tipo: identificarTipoDocumento(texto, href)
-      });
-    }
-  }
-  // Remove duplicatas
-  const unicos = [];
-  const urlsVistas = new Set();
-  for (const link of links) {
-    if (!urlsVistas.has(link.url)) {
-      urlsVistas.add(link.url);
-      unicos.push(link);
-    }
-  }
-  return unicos;
-}
-
 // ============================================
-// DEMAIS FUNÇÕES (PERMANECEM IGUAIS)
+// FUNÇÕES AUXILIARES (mantidas)
 // ============================================
-
-// Obtém o documento com mais texto (recursivo em iframes)
 function getMelhorDocumentoRecursivo(elemento, depth = 0) {
   if (depth > 5) return elemento;
   let melhorDoc = elemento || document;
@@ -207,9 +204,7 @@ function getMelhorDocumentoRecursivo(elemento, depth = 0) {
   let iframes = [];
   try {
     iframes = (elemento || document).querySelectorAll('iframe');
-  } catch (e) {
-    return melhorDoc;
-  }
+  } catch (e) { return melhorDoc; }
   for (const iframe of iframes) {
     try {
       const doc = iframe.contentDocument;
@@ -221,21 +216,15 @@ function getMelhorDocumentoRecursivo(elemento, depth = 0) {
           melhorDoc = docRecursivo;
         }
       }
-    } catch (e) {
-      // cross-origin ignore
-    }
+    } catch (e) {}
   }
   return melhorDoc;
 }
 
-// Extrai número do processo
 function extrairNumero(doc) {
   if (!doc?.body) return null;
   const text = doc.body.innerText || '';
-  const regexList = [
-    /\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/,
-    /\d{20}/
-  ];
+  const regexList = [/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/, /\d{20}/];
   for (const regex of regexList) {
     const match = text.match(regex);
     if (match) return match[0];
@@ -243,7 +232,6 @@ function extrairNumero(doc) {
   return null;
 }
 
-// Extrai tribunal pela URL
 function extrairTribunal() {
   const url = window.location.href.toLowerCase();
   if (url.includes('trt1')) return 'TRT 1ª Região (RJ)';
@@ -256,18 +244,13 @@ function extrairTribunal() {
   return 'Tribunal não identificado';
 }
 
-// Limpa o texto (remove espaços excessivos)
 function limparTexto(texto) {
   return texto.replace(/\s+/g, ' ').replace(/\n\s+/g, '\n').trim();
 }
 
-// Extrai o texto completo do documento (usado pela extração normal)
 function extrairTextoCompleto(doc) {
   if (!doc) return '';
-  const seletores = [
-    'main', 'article', '.conteudo', '#conteudo', '.content', '#content',
-    '.ui-panel', '.rich-panel', 'body'
-  ];
+  const seletores = ['main', 'article', '.conteudo', '#conteudo', '.content', '#content', '.ui-panel', '.rich-panel', 'body'];
   let melhorTexto = '';
   for (const sel of seletores) {
     try {
@@ -281,7 +264,6 @@ function extrairTextoCompleto(doc) {
   return limparTexto(melhorTexto).substring(0, 120000);
 }
 
-// Detecta links de documentos na página (versão simples)
 function detectarLinksDocumentos() {
   const links = [];
   const palavrasChave = ['sentença', 'decisão', 'petição', 'contestação', 'recurso', 'acórdão'];
@@ -296,7 +278,6 @@ function detectarLinksDocumentos() {
   return links;
 }
 
-// Identifica o tipo de documento pelo texto ou URL
 function identificarTipoDocumento(texto, url) {
   const lower = texto.toLowerCase();
   if (lower.includes('sentença')) return 'SENTENÇA';
@@ -312,34 +293,26 @@ function identificarTipoDocumento(texto, url) {
   return 'DOCUMENTO';
 }
 
-// Extrai todo o texto visível da página (para abas temporárias)
 function extrairTextoPagina() {
   const seletores = ['main', '.conteudo', '.content', '#conteudo', '.documento', '.document-content', 'body'];
   let melhorTexto = '';
   for (const sel of seletores) {
     const el = document.querySelector(sel);
-    if (el && el.innerText.length > melhorTexto.length) {
-      melhorTexto = el.innerText;
-    }
+    if (el && el.innerText.length > melhorTexto.length) melhorTexto = el.innerText;
   }
   return melhorTexto || document.body.innerText;
 }
 
-// ============================================
-// FUNÇÃO PRINCIPAL DE EXTRAÇÃO (PÁGINA ATUAL)
-// ============================================
 async function extrairDadosCompletos() {
   console.log('Extraindo metadados e movimentações...');
   await aguardarCarregamento();
   const doc = getMelhorDocumentoRecursivo(document);
   const textoMetadados = extrairTextoCompleto(doc);
   const linksDocs = detectarLinksDocumentos();
-
   let textoDocumentos = '';
   for (const link of linksDocs) {
     textoDocumentos += `\n\n📄 Documento encontrado: ${link.texto}\nURL: ${link.url}\n`;
   }
-
   return {
     numero: extrairNumero(doc),
     tribunal: extrairTribunal(),
@@ -353,50 +326,39 @@ async function extrairDadosCompletos() {
 }
 
 // ============================================
-// LISTENER ÚNICO (TRATA TODAS AS MENSAGENS)
+// LISTENER (com extração assíncrona)
 // ============================================
 chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
-  // Extração padrão (página atual)
   if (req.action === 'extrairProcesso') {
-    extrairDadosCompletos()
-      .then(sendResponse)
-      .catch(err => sendResponse({ error: err.message }));
+    extrairDadosCompletos().then(sendResponse).catch(err => sendResponse({ error: err.message }));
     return true;
   }
-
-  // Extração de texto de uma página (para abas temporárias)
   if (req.action === 'extrairTexto') {
-    const texto = extrairTextoCompleto(document);
-    sendResponse({ texto });
+    sendResponse({ texto: extrairTextoCompleto(document) });
     return true;
   }
-
-  // Extração de texto de página (versão simplificada para abas temporárias)
   if (req.action === 'extrairTextoPagina') {
-    const texto = extrairTextoPagina();
-    sendResponse({ texto });
+    sendResponse({ texto: extrairTextoPagina() });
     return true;
   }
-
-  // Obter seleção do usuário
   if (req.action === 'GET_SELECTION') {
-    const text = window.getSelection()?.toString() || '';
-    sendResponse({ text });
+    sendResponse({ text: window.getSelection()?.toString() || '' });
     return true;
   }
-
-  // Obter lista de links de documentos da página (VERSÃO CORRIGIDA COM EXPANSÃO)
   if (req.action === 'extrairLinksDocumentos') {
     (async () => {
-      const links = await extrairLinksDocumentosCompletos();
-      sendResponse({ links, total: links.length });
+      try {
+        const links = await extrairLinksCompletos();
+        sendResponse({ links, total: links.length });
+      } catch (err) {
+        console.error('[Content] Erro na extração:', err);
+        sendResponse({ error: err.message, links: [], total: 0 });
+      }
     })();
     return true;
   }
-
-  // Se nenhuma ação conhecida
   sendResponse({ error: 'Ação desconhecida' });
   return true;
 });
 
-console.log('Juris Assistant - content script carregado (com expansão de andamentos)');
+console.log('Juris Assistant - content script carregado (com rolagem e expansão total)');
