@@ -1,26 +1,29 @@
 // ============================================
-// BACKGROUND.JS - Extração de todos os documentos (com logs e melhorias)
+// BACKGROUND.JS - Extração robusta com retry e progresso
 // ============================================
+
+let cancelarExtracao = false;
 
 chrome.action.onClicked.addListener((tab) => {
   chrome.sidePanel.open({ tabId: tab.id });
 });
 
-// Extrai um documento de uma URL (abre aba temporária)
-async function extrairDocumento(url) {
+// Extrai um documento com retry exponencial
+async function extrairDocumento(url, tentativa = 1) {
+  const maxTentativas = 3;
+  const timeoutBase = 5000; // 5 segundos
+
   return new Promise((resolve) => {
     chrome.tabs.create({ url: url, active: false }, async (tab) => {
       let tentativas = 0;
-      const maxTentativas = 40;        // Aumentado (antes 20)
+      const maxChecagens = 40; // 40 * 800ms = 32s no total
       const intervalo = setInterval(async () => {
         tentativas++;
         try {
-          // Injeta o content script na aba temporária
           await chrome.scripting.executeScript({
             target: { tabId: tab.id },
             files: ['content.js']
           });
-          // Solicita extração do texto da página
           const resultado = await chrome.tabs.sendMessage(tab.id, { action: 'extrairTextoPagina' });
           if (resultado && resultado.texto && resultado.texto.length > 100) {
             clearInterval(intervalo);
@@ -29,69 +32,82 @@ async function extrairDocumento(url) {
             return;
           }
         } catch(e) {
-          // Ignora erros temporários (script ainda não pronto)
+          // script ainda não pronto
         }
-        if (tentativas >= maxTentativas) {
+        if (tentativas >= maxChecagens) {
           clearInterval(intervalo);
           chrome.tabs.remove(tab.id);
-          resolve({ texto: '', url: url, erro: 'Timeout após ' + maxTentativas + ' tentativas' });
+          if (tentativa < maxTentativas) {
+            // Tenta novamente após delay exponencial
+            setTimeout(() => {
+              extrairDocumento(url, tentativa + 1).then(resolve);
+            }, timeoutBase * tentativa);
+          } else {
+            resolve({ texto: '', url: url, erro: `Timeout após ${maxChecagens} tentativas` });
+          }
         }
-      }, 800); // Aumentado de 500ms para 800ms
+      }, 800);
     });
   });
 }
 
-// Extrai todos os documentos de uma lista de URLs (sequencial com delay)
+// Extrai todos os documentos com fila e progresso
 async function extrairTodosDocumentos(urls, sendResponse) {
-  console.log('[Background] extrairTodosDocumentos iniciado, total de URLs:', urls.length);
+  cancelarExtracao = false;
+  console.log(`[Background] Iniciando extração de ${urls.length} documentos`);
   const resultados = [];
-  
+
   for (let i = 0; i < urls.length; i++) {
+    if (cancelarExtracao) {
+      console.log('[Background] Extração cancelada pelo usuário');
+      sendResponse({ documentos: resultados, cancelado: true });
+      return;
+    }
+
     const link = urls[i];
-    console.log(`[Background] Extraindo documento ${i+1}/${urls.length}: ${link.titulo}`);
-    
-    // Envia progresso para o sidepanel (opcional)
+    console.log(`[Background] (${i+1}/${urls.length}) ${link.titulo}`);
+
+    // Notifica progresso (pode ser usado no sidepanel)
     chrome.runtime.sendMessage({
-      action: 'progressoExtração',
+      action: 'progressoExtracao',
       current: i + 1,
       total: urls.length,
       titulo: link.titulo
-    }).catch(() => {}); // sidepanel pode estar fechado, ignora erro
-    
+    }).catch(() => {});
+
+    const inicio = Date.now();
     const resultado = await extrairDocumento(link.url);
+    const duracao = Date.now() - inicio;
+
     resultados.push({
       titulo: link.titulo,
       tipo: link.tipo,
       texto: resultado.texto || '',
       url: link.url,
-      erro: resultado.erro || null
+      erro: resultado.erro || null,
+      duracaoMs: duracao
     });
-    
-    // Delay entre requisições para não sobrecarregar o servidor/judiciário
-    if (i < urls.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Delay progressivo: 1s + 0.5s por documento (evita bloqueio)
+    const delay = 1000 + (i * 100);
+    if (i < urls.length - 1 && !cancelarExtracao) {
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
-  
-  console.log('[Background] extrairTodosDocumentos finalizado');
-  sendResponse({ documentos: resultados });
+
+  console.log('[Background] Extração concluída');
+  sendResponse({ documentos: resultados, cancelado: false });
 }
 
 // Listener principal
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log('[Background] Mensagem recebida, action:', request.action);
+  console.log('[Background] Mensagem:', request.action);
 
-  // Extração normal da página atual
   if (request.action === 'extrairProcesso') {
-    console.log('[Background] Processando extrairProcesso');
     chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
       const tab = tabs[0];
-      if (!tab || !tab.id) {
-        sendResponse({ error: 'Aba não encontrada' });
-        return;
-      }
-      if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) {
-        sendResponse({ error: 'Não é possível extrair desta página' });
+      if (!tab?.id || !tab.url || tab.url.startsWith('chrome://')) {
+        sendResponse({ error: 'Aba inválida' });
         return;
       }
       try {
@@ -104,30 +120,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             const results = await chrome.tabs.sendMessage(tab.id, { action: 'extrairProcesso' });
             sendResponse(results);
           } catch (err) {
-            sendResponse({ error: 'Erro ao extrair: ' + err.message });
+            sendResponse({ error: 'Erro na mensagem: ' + err.message });
           }
         }, 800);
       } catch (error) {
-        sendResponse({ error: 'Erro ao injetar script: ' + error.message });
+        sendResponse({ error: 'Erro ao injetar: ' + error.message });
       }
     });
     return true;
   }
 
-  // Extração em massa de todos os documentos
   if (request.action === 'extrairTodosDocumentos') {
-    console.log('[Background] Processando extrairTodosDocumentos');
     const urls = request.urls;
-    if (!urls || urls.length === 0) {
-      sendResponse({ error: 'Nenhum documento encontrado' });
+    if (!urls?.length) {
+      sendResponse({ error: 'Nenhum documento' });
       return true;
     }
     extrairTodosDocumentos(urls, sendResponse);
     return true;
   }
 
-  // Qualquer outra ação
-  console.warn('[Background] Ação desconhecida:', request.action);
+  if (request.action === 'cancelarExtracao') {
+    cancelarExtracao = true;
+    sendResponse({ ok: true });
+    return true;
+  }
+
   sendResponse({ error: 'Ação desconhecida' });
   return true;
 });

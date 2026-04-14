@@ -1,5 +1,5 @@
 // ============================================
-// CONTENT.JS - EXTRAÇÃO MASSIVA COM EXPANSÃO TOTAL E SCROLL
+// CONTENT.JS - EXTRAÇÃO POR IDS DE DOCUMENTO
 // ============================================
 
 // Aguarda carregamento da página
@@ -19,183 +19,126 @@ function aguardarCarregamento() {
 }
 
 // ============================================
-// ROLAGEM PARA CARREGAR MAIS ITENS (LAZY LOADING)
+// EXTRAI TODOS OS IDs DE DOCUMENTO DO TEXTO
 // ============================================
-async function rolarAteOFim() {
-  console.log('[Content] Rolando página para carregar mais andamentos...');
-  let alturaAnterior = 0;
-  let scrolls = 0;
-  const maxScrolls = 20;
-  while (scrolls < maxScrolls) {
-    window.scrollTo(0, document.body.scrollHeight);
-    await new Promise(r => setTimeout(r, 1000));
-    const novaAltura = document.body.scrollHeight;
-    if (novaAltura === alturaAnterior) break;
-    alturaAnterior = novaAltura;
-    scrolls++;
+function extrairIdsDocumentos() {
+  const texto = document.body.innerText;
+  const ids = new Set();
+  
+  // Padrão 1: "Id c817c5a" (letras+ números, geralmente 7 caracteres)
+  const regexId = /Id\s+([a-z0-9]{7,8})/gi;
+  let match;
+  while ((match = regexId.exec(texto)) !== null) {
+    ids.add(match[1]);
   }
-  console.log('[Content] Rolagem finalizada.');
+  
+  // Padrão 2: "Número do documento: 251105191194450000005540180128"
+  const regexNumDoc = /Número do documento:\s*(\d{20,})/gi;
+  while ((match = regexNumDoc.exec(texto)) !== null) {
+    ids.add(match[1]);
+  }
+  
+  // Padrão 3: "idDocumento=..." em URLs (caso existam links)
+  const regexUrlId = /[?&]idDocumento=([a-z0-9]+)/gi;
+  const links = document.querySelectorAll('a[href]');
+  for (const link of links) {
+    while ((match = regexUrlId.exec(link.href)) !== null) {
+      ids.add(match[1]);
+    }
+  }
+  
+  return Array.from(ids);
 }
 
 // ============================================
-// EXPANSÃO TOTAL DE ANDAMENTOS (VERSÃO EXTREMA)
+// MONTA A URL DE VISUALIZAÇÃO DO PJE
 // ============================================
-async function expandirTudo() {
-  console.log('[Content] Iniciando expansão de andamentos...');
-  
-  // Lista ampliada de seletores de botões de expansão
-  const seletoresExpansao = [
-    'button[aria-label="Expandir"]',
-    'button[aria-label="expandir"]',
-    'mat-icon-button[aria-label="Expandir"]',
-    '.fa-plus', '.fa-chevron-down', '.fa-angle-down',
-    '.tree-toggle', '.expand-button', '.accordion-toggle',
-    '[data-toggle="collapse"]', '.mat-expansion-panel-header',
-    '.tree-node__toggle', '.movimentacao .toggle', '.andamento .toggle',
-    'img[alt="Expandir"]', 'a[title="Expandir"]',
-    'button:has(> .fa-plus)', 'button:has(> .fa-chevron-down)',
-    '.mat-icon-button', '.expand-icon'
-  ];
-  
-  let expandiu = true;
-  let iteracoes = 0;
-  const maxIteracoes = 10;
-  
-  while (expandiu && iteracoes < maxIteracoes) {
-    expandiu = false;
-    iteracoes++;
-    
-    for (const sel of seletoresExpansao) {
-      const botoes = document.querySelectorAll(sel);
-      for (const btn of botoes) {
-        // Verifica se está visível e se o elemento pai não está expandido
-        const parent = btn.closest('.mat-expansion-panel, .tree-node, .movimentacao-item, .andamento-item, .card');
-        const estaExpandido = parent?.getAttribute('aria-expanded') === 'true' ||
-                              parent?.classList?.contains('mat-expanded') ||
-                              parent?.classList?.contains('open');
-        
-        if (!estaExpandido && btn.offsetParent !== null) {
-          try {
-            btn.click();
-            expandiu = true;
-            await new Promise(r => setTimeout(r, 300));
-          } catch(e) {}
-        }
-      }
-    }
-    
-    // Força clique em qualquer elemento que contenha ícone de "+" ou "expandir"
-    const icones = document.querySelectorAll('i.fa-plus, i.fa-chevron-down, span:contains("Expandir")');
-    for (const icon of icones) {
-      const btn = icon.closest('button') || icon;
-      if (btn.offsetParent !== null) {
-        try {
-          btn.click();
-          expandiu = true;
-          await new Promise(r => setTimeout(r, 300));
-        } catch(e) {}
-      }
-    }
-    
-    await new Promise(r => setTimeout(r, 500));
+function montarUrlDocumento(id) {
+  const baseUrl = window.location.origin;
+  // Tenta descobrir o padrão correto do tribunal
+  if (baseUrl.includes('pje.trt')) {
+    // Formato comum do PJE
+    return `${baseUrl}/pje/Processo/ConsultaDocumento/listView.seam?${id}`;
   }
-  
-  console.log('[Content] Expansão concluída após', iteracoes, 'iterações.');
+  // Fallback: tenta com id como parâmetro
+  return `${baseUrl}/visualizador/?id=${id}`;
 }
 
 // ============================================
-// EXTRAÇÃO DE LINKS APÓS EXPANSÃO E ROLAGEM
+// FUNÇÃO PRINCIPAL PARA EXTRAIR LINKS (VIA IDs)
 // ============================================
-async function extrairLinksCompletos() {
-  // 1. Rolar para carregar lazy loading
-  await rolarAteOFim();
+async function extrairLinksPorIds() {
+  await aguardarCarregamento();
+  const ids = extrairIdsDocumentos();
+  console.log(`[Content] IDs encontrados: ${ids.length}`, ids);
   
-  // 2. Expandir todos os andamentos
-  await expandirTudo();
-  await new Promise(r => setTimeout(r, 1500));
+  const links = [];
+  for (const id of ids) {
+    let url = montarUrlDocumento(id);
+    // Se o ID for numérico longo, talvez seja o número do documento direto
+    if (/^\d{20,}$/.test(id)) {
+      url = `${window.location.origin}/pje/Processo/ConsultaDocumento/listView.seam?numeroDocumento=${id}`;
+    }
+    links.push({
+      url: url,
+      titulo: `Documento ID: ${id}`,
+      tipo: 'DOCUMENTO'
+    });
+  }
   
-  // 3. Coletar links
-  const links = new Map();
+  // Remove duplicatas
+  const unicos = [];
+  const urlsVistas = new Set();
+  for (const link of links) {
+    if (!urlsVistas.has(link.url)) {
+      urlsVistas.add(link.url);
+      unicos.push(link);
+    }
+  }
+  return unicos;
+}
+
+// ============================================
+// FUNÇÃO ANTIGA (FALLBACK) - MANTIDA PARA COMPATIBILIDADE
+// ============================================
+function extrairLinksDocumentos() {
+  const links = [];
   const seletores = [
     'a[href*="download"]',
     'a[href*="documento"]',
     'a[href*="visualizar"]',
     'a[href*="pdf"]',
-    'a[href*="idDocumento"]',
-    'a[href*="documentoId"]',
-    'a.linkVisualizar',
-    'a.linkDocumento',
     '.movimentacao a',
     '.andamento a',
-    '.tree a',
     'tr a',
-    'td a',
-    'mat-card a',
-    '.documento-link',
-    'a[target="_blank"]'
+    'td a'
   ];
-  
   const elementos = document.querySelectorAll(seletores.join(','));
-  console.log(`[Content] Encontrados ${elementos.length} elementos candidatos a link.`);
-  
   for (const el of elementos) {
-    let href = el.href;
-    let texto = (el.innerText || el.textContent || '').trim();
-    
-    if (href && href.startsWith('/')) {
-      href = window.location.origin + href;
-    }
-    
-    if (href && href.startsWith('http') && !href.includes('login') && texto.length > 2) {
-      if (!links.has(href)) {
-        links.set(href, {
-          url: href,
-          titulo: texto.substring(0, 120),
-          tipo: identificarTipoDocumento(texto, href)
-        });
-      }
-    }
-  }
-  
-  // 4. Se ainda não encontrou nada, busca dentro de iframes
-  if (links.size === 0) {
-    const iframes = document.querySelectorAll('iframe');
-    for (const iframe of iframes) {
-      try {
-        const doc = iframe.contentDocument;
-        if (doc) {
-          const linksIframe = extrairLinksDoDocumento(doc);
-          for (const link of linksIframe) {
-            if (!links.has(link.url)) links.set(link.url, link);
-          }
-        }
-      } catch(e) {}
-    }
-  }
-  
-  console.log(`[Content] Total final de links únicos: ${links.size}`);
-  return Array.from(links.values());
-}
-
-function extrairLinksDoDocumento(doc) {
-  const links = [];
-  const elementos = doc.querySelectorAll('a[href]');
-  for (const el of elementos) {
-    let href = el.href;
-    let texto = (el.innerText || '').trim();
-    if (href && href.startsWith('http') && texto.length > 2) {
+    const href = el.href;
+    const texto = el.innerText || el.textContent || '';
+    if (href && href.startsWith('http') && !href.includes('login') && texto.length > 5) {
       links.push({
         url: href,
-        titulo: texto.substring(0, 120),
+        titulo: texto.trim(),
         tipo: identificarTipoDocumento(texto, href)
       });
     }
   }
-  return links;
+  // Remove duplicatas
+  const unicos = [];
+  const urlsVistas = new Set();
+  for (const link of links) {
+    if (!urlsVistas.has(link.url)) {
+      urlsVistas.add(link.url);
+      unicos.push(link);
+    }
+  }
+  return unicos;
 }
 
 // ============================================
-// FUNÇÕES AUXILIARES (mantidas)
+// DEMAIS FUNÇÕES (EXTRAÇÃO DE TEXTO, NÚMERO, ETC)
 // ============================================
 function getMelhorDocumentoRecursivo(elemento, depth = 0) {
   if (depth > 5) return elemento;
@@ -298,7 +241,9 @@ function extrairTextoPagina() {
   let melhorTexto = '';
   for (const sel of seletores) {
     const el = document.querySelector(sel);
-    if (el && el.innerText.length > melhorTexto.length) melhorTexto = el.innerText;
+    if (el && el.innerText.length > melhorTexto.length) {
+      melhorTexto = el.innerText;
+    }
   }
   return melhorTexto || document.body.innerText;
 }
@@ -326,7 +271,7 @@ async function extrairDadosCompletos() {
 }
 
 // ============================================
-// LISTENER (com extração assíncrona)
+// LISTENER (usa extração por IDs)
 // ============================================
 chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
   if (req.action === 'extrairProcesso') {
@@ -348,7 +293,12 @@ chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
   if (req.action === 'extrairLinksDocumentos') {
     (async () => {
       try {
-        const links = await extrairLinksCompletos();
+        // Tenta primeiro extrair por IDs (mais confiável)
+        let links = await extrairLinksPorIds();
+        if (links.length === 0) {
+          // Fallback para o método antigo
+          links = extrairLinksDocumentos();
+        }
         sendResponse({ links, total: links.length });
       } catch (err) {
         console.error('[Content] Erro na extração:', err);
@@ -361,4 +311,4 @@ chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
   return true;
 });
 
-console.log('Juris Assistant - content script carregado (com rolagem e expansão total)');
+console.log('Juris Assistant - content script carregado (extração por IDs)');
